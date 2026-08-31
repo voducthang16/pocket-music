@@ -8,105 +8,141 @@
 
 #include "app/navigation.hpp"
 #include "ui/layout.hpp"
+#include "ui/primitives.hpp"
+#include "ui/theme.hpp"
 
 namespace {
-const SDL_Color white{250, 250, 250, 255}, black{25, 25, 28, 255}, gray{105, 105, 112, 255},
-    blue{31, 114, 205, 255};
-void fill(SDL_Renderer* r, SDL_Rect rect, SDL_Color c) {
-    SDL_SetRenderDrawColor(r, c.r, c.g, c.b, c.a);
-    SDL_RenderFillRect(r, &rect);
-}
-void text(SDL_Renderer* r, TTF_Font* f, const std::string& v, int x, int y, SDL_Color c,
-          int max = 0, bool center = false) {
-    if (v.empty()) return;
-    SDL_Surface* s = TTF_RenderUTF8_Blended(f, v.c_str(), c);
-    if (!s) return;
-    SDL_Texture* t = SDL_CreateTextureFromSurface(r, s);
-    SDL_Rect target{x, y, s->w, s->h};
-    if (max > 0 && target.w > max) target.w = max;
-    if (center) target.x = x - target.w / 2;
-    SDL_RenderCopy(r, t, nullptr, &target);
-    SDL_DestroyTexture(t);
-    SDL_FreeSurface(s);
-}
 std::string duration(int seconds) {
-    std::ostringstream s;
-    s << seconds / 60 << ':' << std::setw(2) << std::setfill('0') << seconds % 60;
-    return s.str();
+    std::ostringstream stream;
+    stream << seconds / 60 << ':' << std::setw(2) << std::setfill('0') << seconds % 60;
+    return stream.str();
 }
-void header(AppState& app) {
-    fill(app.renderer, {0, 0, layout::width, layout::headerHeight}, {224, 225, 229, 255});
-    text(app.renderer, app.titleFont, screenHeading(app), layout::width / 2, 17, black, 560, true);
-    text(app.renderer, app.smallFont, app.player.paused() ? "II" : ">", 20, 22, gray);
-    text(app.renderer, app.smallFont, "100%", layout::width - 87, 22, gray);
-    fill(app.renderer, {layout::width - 34, 25, 22, 12}, {102, 190, 90, 255});
+
+void drawHeader(AppState& app) {
+    verticalGradient(app.renderer, {0, 0, layout::width, layout::headerHeight}, theme::headerTop,
+                     theme::headerBottom);
+    fillRect(app.renderer, {0, layout::headerHeight - 2, layout::width, 2}, {153, 158, 166, 255});
+    drawText(app.renderer, app.titleFont, screenHeading(app), layout::width / 2, 12, theme::text,
+             520, true);
+    if (app.currentTrack >= 0) {
+        drawPlayState(app.renderer, 27, 27, app.player.paused(), theme::textMuted);
+    }
+    drawBattery(app.renderer, layout::width - 66, 27, 100);
 }
-void list(AppState& app) {
+
+void drawEmptyState(AppState& app) {
+    fillRect(app.renderer, {layout::width / 2 - 68, 250, 136, 136}, {225, 228, 233, 255});
+    drawPlayState(app.renderer, layout::width / 2 - 18, 300, false, theme::textMuted);
+    drawText(app.renderer, app.bodyFont, "No music found", layout::width / 2, 430, theme::text, 600,
+             true);
+    drawText(app.renderer, app.smallFont, "Copy songs into the Music folder", layout::width / 2,
+             490, theme::textMuted, 650, true);
+}
+
+void drawList(AppState& app) {
     const auto items = visibleLabels(app);
     if (items.empty()) {
-        text(app.renderer, app.bodyFont, "No music found", layout::width / 2, 250, gray, 600, true);
-        text(app.renderer, app.smallFont, "Copy songs into the Music folder", layout::width / 2,
-             315, gray, 650, true);
+        drawEmptyState(app);
         return;
     }
     const int visible = (layout::height - layout::headerHeight) / layout::rowHeight;
     if (app.selected < app.scroll) app.scroll = app.selected;
     if (app.selected >= app.scroll + visible) app.scroll = app.selected - visible + 1;
     for (int row = 0; row < visible && app.scroll + row < static_cast<int>(items.size()); ++row) {
-        int index = app.scroll + row, y = layout::headerHeight + row * layout::rowHeight;
-        bool active = index == app.selected;
-        if (active) fill(app.renderer, {0, y, layout::width, layout::rowHeight}, blue);
-        text(app.renderer, app.bodyFont, items[index], 28, y + 18, active ? white : black,
-             layout::width - 90);
-        text(app.renderer, app.bodyFont, ">", layout::width - 48, y + 18, active ? white : gray);
-        fill(app.renderer, {0, y + layout::rowHeight - 1, layout::width, 1}, {220, 220, 223, 255});
+        const int index = app.scroll + row;
+        const int y = layout::headerHeight + row * layout::rowHeight;
+        const bool active = index == app.selected;
+        if (active) {
+            verticalGradient(app.renderer, {0, y, layout::width, layout::rowHeight}, theme::blueTop,
+                             theme::blueBottom);
+        } else {
+            fillRect(app.renderer, {0, y, layout::width, layout::rowHeight}, theme::surface);
+        }
+        drawText(app.renderer, app.bodyFont, items[index], 30, y + 18,
+                 active ? theme::white : theme::text, layout::width - 105);
+        drawChevron(app.renderer, layout::width - 43, y + layout::rowHeight / 2,
+                    active ? theme::white : theme::textMuted);
+        fillRect(app.renderer, {0, y + layout::rowHeight - 1, layout::width, 1},
+                 active ? theme::blueBottom : theme::divider);
+    }
+
+    if (items.size() > static_cast<size_t>(visible)) {
+        const int trackHeight = layout::height - layout::headerHeight - 24;
+        const int thumbHeight =
+            std::max(48, trackHeight * visible / static_cast<int>(items.size()));
+        const int maxScroll = static_cast<int>(items.size()) - visible;
+        const int thumbY = layout::headerHeight + 12 +
+                           (trackHeight - thumbHeight) * app.scroll / std::max(1, maxScroll);
+        fillRect(app.renderer, {layout::width - 8, thumbY, 4, thumbHeight}, {140, 145, 155, 180});
     }
 }
-SDL_Texture* cover(AppState& app, const Track& track) {
+
+SDL_Texture* albumCover(AppState& app, const Track& track) {
     if (track.coverPath.empty()) return nullptr;
-    auto key = track.coverPath.string();
+    const auto key = track.coverPath.string();
     if (app.coverCache.contains(key)) return app.coverCache[key];
     return app.coverCache[key] = IMG_LoadTexture(app.renderer, key.c_str());
 }
-void nowPlaying(AppState& app) {
+
+void drawPlaceholderCover(AppState& app, const SDL_Rect& art) {
+    verticalGradient(app.renderer, art, {231, 233, 238, 255}, {189, 194, 203, 255});
+    fillRect(app.renderer, {art.x + 118, art.y + 118, art.w - 236, art.h - 236}, {54, 60, 70, 255});
+    fillRect(app.renderer, {art.x + art.w / 2 - 28, art.y + art.h / 2 - 28, 56, 56},
+             theme::background);
+    drawText(app.renderer, app.smallFont, "CLASSIC IPOD", art.x + art.w / 2, art.y + art.h - 62,
+             theme::textMuted, art.w - 80, true);
+}
+
+void drawNowPlaying(AppState& app) {
     if (app.currentTrack < 0 || app.currentTrack >= static_cast<int>(app.library.tracks().size())) {
-        text(app.renderer, app.bodyFont, "Nothing Playing", layout::width / 2, 300, gray, 600,
-             true);
+        drawEmptyState(app);
         return;
     }
     const auto& track = app.library.tracks()[app.currentTrack];
-    SDL_Rect art{layout::width / 2 - 245, 115, 490, 490};
-    if (auto* texture = cover(app, track))
+    const SDL_Rect shadow{layout::width / 2 - 224, 112, 448, 448};
+    fillRect(app.renderer, shadow, {181, 184, 190, 255});
+    const SDL_Rect art{shadow.x + 5, shadow.y + 5, shadow.w - 10, shadow.h - 10};
+    if (SDL_Texture* texture = albumCover(app, track))
         SDL_RenderCopy(app.renderer, texture, nullptr, &art);
-    else {
-        fill(app.renderer, art, {215, 216, 222, 255});
-        text(app.renderer, app.titleFont, "MUSIC", layout::width / 2, 325, gray, 400, true);
-    }
-    text(app.renderer, app.titleFont, track.title, layout::width / 2, 650, black, 690, true);
-    text(app.renderer, app.bodyFont, track.artist, layout::width / 2, 710, gray, 650, true);
-    text(app.renderer, app.smallFont, track.album, layout::width / 2, 760, gray, 650, true);
-    int elapsed = std::max(0, app.player.elapsedSeconds()),
-        total = std::max(1, track.durationSeconds);
-    fill(app.renderer, {55, 846, layout::width - 110, 12}, {205, 206, 210, 255});
-    fill(app.renderer,
-         {55, 846, std::min(layout::width - 110, (layout::width - 110) * elapsed / total), 12},
-         blue);
-    text(app.renderer, app.smallFont, duration(elapsed), 55, 874, gray);
-    text(app.renderer, app.smallFont, duration(track.durationSeconds), layout::width - 125, 874,
-         gray);
+    else
+        drawPlaceholderCover(app, art);
+
+    drawMarqueeText(app.renderer, app.titleFont, track.title, {52, 598, layout::width - 104, 56},
+                    theme::text, SDL_GetTicks64());
+    drawText(app.renderer, app.bodyFont, track.artist, layout::width / 2, 666, theme::textMuted,
+             layout::width - 110, true);
+    drawText(app.renderer, app.smallFont, track.album, layout::width / 2, 719, theme::textMuted,
+             layout::width - 130, true);
+
+    const int elapsed = std::max(0, app.player.elapsedSeconds());
+    const int total = std::max(1, track.durationSeconds);
+    const int progressWidth = layout::width - 110;
+    const int filled = std::min(progressWidth, progressWidth * elapsed / total);
+    fillRect(app.renderer, {55, 805, progressWidth, 9}, {197, 201, 208, 255});
+    verticalGradient(app.renderer, {55, 805, filled, 9}, theme::blueTop, theme::blueBottom);
+    fillRect(app.renderer, {55 + std::max(0, filled - 4), 799, 9, 21}, theme::white);
+    strokeRect(app.renderer, {55 + std::max(0, filled - 4), 799, 9, 21}, theme::textMuted);
+    drawText(app.renderer, app.smallFont, duration(elapsed), 55, 833, theme::textMuted);
+    drawText(app.renderer, app.smallFont, duration(track.durationSeconds), layout::width - 126, 833,
+             theme::textMuted);
+
+    const char* state = app.player.paused() ? "PAUSED" : "PLAYING";
+    drawText(app.renderer, app.smallFont, state, layout::width / 2, 886, theme::blue, 200, true);
     std::string modes =
-        std::string(app.shuffle ? "Shuffle  " : "") + (app.repeatMode == 1   ? "Repeat One"
-                                                       : app.repeatMode == 2 ? "Repeat All"
+        std::string(app.shuffle ? "SHUFFLE  " : "") + (app.repeatMode == 1   ? "REPEAT ONE"
+                                                       : app.repeatMode == 2 ? "REPEAT ALL"
                                                                              : "");
-    text(app.renderer, app.smallFont, modes, layout::width / 2, 930, blue, 500, true);
+    drawText(app.renderer, app.smallFont, modes, layout::width / 2, 929, theme::textMuted, 500,
+             true);
 }
 }  // namespace
+
 void renderApp(AppState& app) {
-    fill(app.renderer, {0, 0, layout::width, layout::height}, white);
-    header(app);
+    fillRect(app.renderer, {0, 0, layout::width, layout::height}, theme::background);
+    drawHeader(app);
     if (app.screen == Screen::NowPlaying)
-        nowPlaying(app);
+        drawNowPlaying(app);
     else
-        list(app);
+        drawList(app);
     SDL_RenderPresent(app.renderer);
 }

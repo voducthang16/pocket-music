@@ -28,7 +28,7 @@ MpvPlayer::~MpvPlayer() { stop(); }
 
 bool MpvPlayer::start() {
     if (process_ > 0) return true;
-    socketPath_ = "/tmp/classic-ipod-" + std::to_string(getpid()) + ".sock";
+    socketPath_ = "/tmp/pocket-music-" + std::to_string(getpid()) + ".sock";
     unlink(socketPath_.c_str());
     process_ = fork();
     if (process_ == 0) {

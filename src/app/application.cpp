@@ -13,7 +13,7 @@
 
 namespace {
 std::filesystem::path fontPath() {
-    if (const char* custom = std::getenv("CLASSIC_IPOD_FONT")) return custom;
+    if (const char* custom = std::getenv("POCKET_MUSIC_FONT")) return custom;
 #ifdef __APPLE__
     return "/System/Library/Fonts/Supplemental/Arial.ttf";
 #else
@@ -28,7 +28,7 @@ bool initializeUi(AppState& app) {
         std::cerr << "SDL initialization failed: " << SDL_GetError() << '\n';
         return false;
     }
-    app.window = SDL_CreateWindow("Classic iPod", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+    app.window = SDL_CreateWindow("Pocket Music", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                                   480, 640, SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
     app.renderer =
         SDL_CreateRenderer(app.window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);

@@ -1,5 +1,6 @@
 /build/
 /Music/
 /.DS_Store
+/.pocket-music-state
 /.classic-ipod-state
 *.log

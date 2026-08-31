@@ -1,6 +1,6 @@
-# Classic iPod for TrimUI Brick Hammer
+# Pocket Music
 
-A lightweight, controller-first music player inspired by the classic iPod UI. The current MVP runs on macOS for rapid UI and library development; the same SDL2 core is intended for the TrimUI Brick Hammer Stock OS port.
+A lightweight, controller-first offline music player for Linux handhelds. The current MVP runs on macOS for rapid development; TrimUI Brick Hammer Stock OS is the first hardware target.
 
 The agreed product scope and acceptance criteria are documented in [`docs/MVP.md`](docs/MVP.md).
 
@@ -51,13 +51,7 @@ cmake --build build
 Put music under `Music/`, or point at another directory:
 
 ```sh
-./build/classic-ipod --music "/path/to/Music"
-```
-
-To test the audio backend without opening the UI:
-
-```sh
-./build/classic-ipod --audio-test "/path/to/song.mp3"
+./build/pocket-music --music "/path/to/Music"
 ```
 
 ## Controls

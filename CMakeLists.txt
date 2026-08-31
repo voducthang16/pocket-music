@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(classic_ipod VERSION 0.1.0 LANGUAGES CXX)
+project(pocket_music VERSION 0.1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -10,7 +10,7 @@ find_package(SDL2_ttf CONFIG REQUIRED)
 find_package(SDL2_image CONFIG REQUIRED)
 find_package(TagLib CONFIG REQUIRED)
 
-add_executable(classic-ipod
+add_executable(pocket-music
   src/main.cpp
   src/app/application.cpp
   src/app/navigation.cpp
@@ -18,12 +18,13 @@ add_executable(classic-ipod
   src/core/player.cpp
   src/core/state.cpp
   src/ui/input.cpp
+  src/ui/primitives.cpp
   src/ui/renderer.cpp
 )
 
-target_include_directories(classic-ipod PRIVATE src)
-target_compile_options(classic-ipod PRIVATE -Wall -Wextra -Wpedantic)
-target_link_libraries(classic-ipod PRIVATE
+target_include_directories(pocket-music PRIVATE src)
+target_compile_options(pocket-music PRIVATE -Wall -Wextra -Wpedantic)
+target_link_libraries(pocket-music PRIVATE
   SDL2::SDL2
   SDL2_ttf::SDL2_ttf
   SDL2_image::SDL2_image
@@ -31,10 +32,10 @@ target_link_libraries(classic-ipod PRIVATE
 )
 
 if(APPLE)
-  target_link_libraries(classic-ipod PRIVATE "-framework CoreFoundation")
+  target_link_libraries(pocket-music PRIVATE "-framework CoreFoundation")
 endif()
 
 include(CTest)
 if(BUILD_TESTING)
-  add_test(NAME smoke COMMAND classic-ipod --smoke-test)
+  add_test(NAME smoke COMMAND pocket-music --smoke-test)
 endif()

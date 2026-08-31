@@ -71,6 +71,7 @@ void handleMouse(AppState& app, const SDL_MouseButtonEvent& event) {
         selectCurrentItem(app);
     }
 }
+
 void handleControllerButton(AppState& app, Uint8 b) {
     switch (b) {
         case SDL_CONTROLLER_BUTTON_DPAD_UP:

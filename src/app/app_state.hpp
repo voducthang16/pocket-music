@@ -10,7 +10,7 @@
 #include <vector>
 
 #include "core/library.hpp"
-#include "core/player.hpp"
+#include "core/playback_controller.hpp"
 #include "core/state.hpp"
 #include "settings/preferences.hpp"
 #include "ui/theme.hpp"
@@ -50,22 +50,17 @@ struct AppState {
     TTF_Font* bodyFont = nullptr;
     TTF_Font* smallFont = nullptr;
     MusicLibrary library;
-    std::unique_ptr<AudioPlayer> player;
-    SavedState saved;
+    PlaybackController playback;
+    PlaybackSession session;
     AppPreferences preferences;
     ThemePalette theme = resolveTheme(ThemeMode::Dark);
     ViewState view;
     std::vector<ViewState> history;
-    std::vector<size_t> queue;
-    size_t queuePosition = 0;
-    int currentTrack = -1;
     bool running = true;
-    bool shuffle = false;
-    int repeatMode = 0;
     std::string message;
     std::map<std::string, SDL_Texture*> coverCache;
     std::vector<SDL_GameController*> controllers;
     explicit AppState(std::filesystem::path path,
                       std::unique_ptr<AudioPlayer> audioPlayer = std::make_unique<MpvPlayer>())
-        : library(std::move(path)), player(std::move(audioPlayer)) {}
+        : library(std::move(path)), playback(library, std::move(audioPlayer)) {}
 };

@@ -1,31 +1,11 @@
 #include <memory>
-#include <utility>
 
 #include "app/app_state.hpp"
 #include "app/navigation.hpp"
+#include "fake_player.hpp"
 #include "test_suites.hpp"
 namespace fs = std::filesystem;
 namespace {
-class FakePlayer final : public AudioPlayer {
-   public:
-    bool load(const fs::path& path, int startSeconds) override {
-        loadedPath = path;
-        loadedPosition = startSeconds;
-        ++loadCount;
-        return loadSucceeds;
-    }
-    void togglePause() override { state.paused = !state.paused; }
-    void seek(int seconds) override { state.positionSeconds += seconds; }
-    PlayerSnapshot snapshot() const override { return state; }
-    bool consumeEnded() override { return std::exchange(ended, false); }
-    std::string error() const override { return "fake player failure"; }
-    fs::path loadedPath;
-    int loadedPosition = 0;
-    int loadCount = 0;
-    bool loadSucceeds = true;
-    bool ended = false;
-    PlayerSnapshot state;
-};
 void navigationQueue() {
     TemporaryDirectory temporary;
     const auto music = temporary.path / "Music";
@@ -43,10 +23,10 @@ void navigationQueue() {
     selectCurrentItem(app);
     require(app.view.screen == Screen::NowPlaying && app.history.size() == 2,
             "playing must push Now Playing without losing history");
-    require(app.queue.size() == 2 && app.queuePosition == 1,
+    require(app.playback.queue().source().size() == 2 && app.playback.queue().current() == 1,
             "playback queue must match the selected track view");
     playAdjacentTrack(app, -1);
-    require(app.queuePosition == 0 && fake->loadCount == 2,
+    require(app.playback.queue().current() == 0 && fake->loadCount == 2,
             "previous must move inside the active queue");
     navigateBack(app);
     require(app.view.screen == Screen::Tracks, "first Back must restore the track view");
@@ -63,8 +43,9 @@ void failedLoad() {
     require(app.library.scan(), "failure fixture must scan");
     buildLibraryView(app);
     require(!playTrack(app, 0, app.library.allTrackIndexes()), "load failure must propagate");
-    require(app.currentTrack == -1 && app.queue.empty() && app.history.empty(),
-            "load failure must not mutate navigation or queue state");
+    require(
+        !app.playback.snapshot().trackIndex && app.playback.queue().empty() && app.history.empty(),
+        "load failure must not mutate navigation or queue state");
     require(!app.message.empty(), "load failure must be visible to the UI state");
 }
 

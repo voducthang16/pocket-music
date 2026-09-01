@@ -7,6 +7,7 @@
 
 #include "app/app_state.hpp"
 #include "app/navigation.hpp"
+#include "core/playback_session.hpp"
 #include "ui/input.hpp"
 #include "ui/layout.hpp"
 #include "ui/primitives.hpp"
@@ -65,27 +66,22 @@ bool initializeUi(AppState& app, bool fullscreen) {
 }
 
 void restore(AppState& app, const std::filesystem::path& path) {
-    app.saved = loadState(path);
-    app.shuffle = app.saved.shuffle;
-    app.repeatMode = app.saved.repeatMode;
-    for (size_t i = 0; i < app.library.tracks().size(); ++i)
-        if (app.library.tracks()[i].path.string() == app.saved.trackPath) {
-            if (playTrack(app, i, app.library.allTrackIndexes(), app.saved.positionSeconds) &&
-                app.saved.screen != "now-playing")
-                buildLibraryView(app);
-            break;
-        }
+    app.session = loadSession(path);
+    app.playback.setRepeatMode(static_cast<RepeatMode>(app.session.repeatMode));
+    auto resolved = resolvePlaybackSession(app.session, app.library);
+    if (!resolved) return;
+    if (app.playback.restore(std::move(resolved->source), std::move(resolved->order),
+                             std::move(resolved->history), resolved->cursor, app.session.shuffle,
+                             app.session.positionSeconds, app.session.sourceTitle) &&
+        app.session.screen == "now-playing")
+        app.view = {Screen::NowPlaying, "Now Playing", "POCKET MUSIC", {}, 0, 0};
 }
 
 void persist(AppState& app, const std::filesystem::path& path) {
-    if (app.currentTrack >= 0) {
-        app.saved.trackPath = app.library.tracks()[app.currentTrack].path.string();
-        app.saved.positionSeconds = static_cast<int>(app.player->snapshot().positionSeconds);
-    }
-    app.saved.shuffle = app.shuffle;
-    app.saved.repeatMode = app.repeatMode;
-    app.saved.screen = app.view.screen == Screen::NowPlaying ? "now-playing" : "library";
-    if (!saveState(path, app.saved)) std::cerr << "Could not save playback state\n";
+    auto session =
+        capturePlaybackSession(app.playback, app.library, app.view.screen == Screen::NowPlaying);
+    app.session = session;
+    if (!saveSession(path, session)) std::cerr << "Could not save playback state\n";
 }
 
 void destroyUi(AppState& app) {
@@ -119,6 +115,8 @@ int runApplication(const std::filesystem::path& musicPath, const std::filesystem
         return 1;
     }
     restore(app, statePath);
+    uint64_t savedRevision = app.playback.revision();
+    Uint64 lastSessionSave = SDL_GetTicks64();
     int heldButton = -1;
     Uint64 nextControllerRepeat = 0;
     while (app.running) {
@@ -149,6 +147,14 @@ int runApplication(const std::filesystem::path& musicPath, const std::filesystem
             nextControllerRepeat = SDL_GetTicks64() + 90;
         }
         advanceWhenFinished(app);
+        const Uint64 now = SDL_GetTicks64();
+        const bool periodicSave =
+            app.playback.snapshot().trackIndex && now - lastSessionSave >= 15000;
+        if (app.playback.revision() != savedRevision || periodicSave) {
+            persist(app, statePath);
+            savedRevision = app.playback.revision();
+            lastSessionSave = now;
+        }
         renderApp(app);
         SDL_Delay(16);
     }

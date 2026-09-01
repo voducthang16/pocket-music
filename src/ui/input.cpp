@@ -24,13 +24,16 @@ void handleKey(AppState& app, SDL_Keycode code) {
             break;
         case SDLK_SPACE:
         case SDLK_s:
-            app.player->togglePause();
+            if (app.playback.snapshot().phase == PlaybackPhase::Error)
+                app.playback.retry();
+            else
+                app.playback.togglePause();
             break;
         case SDLK_LEFT:
-            app.player->seek(-10);
+            app.playback.seekRelative(-10);
             break;
         case SDLK_RIGHT:
-            app.player->seek(10);
+            app.playback.seekRelative(10);
             break;
         case SDLK_q:
             playAdjacentTrack(app, -1);
@@ -39,16 +42,17 @@ void handleKey(AppState& app, SDL_Keycode code) {
             playAdjacentTrack(app, 1);
             break;
         case SDLK_x:
-            if (app.currentTrack >= 0 && app.view.screen != Screen::NowPlaying) {
+            if (app.playback.snapshot().trackIndex && app.view.screen != Screen::NowPlaying) {
                 app.history.push_back(std::move(app.view));
                 app.view = {Screen::NowPlaying, "Now Playing", "POCKET MUSIC", {}, 0, 0};
             }
             break;
         case SDLK_y:
-            app.shuffle = !app.shuffle;
+            app.playback.setShuffle(!app.playback.shuffle());
             break;
         case SDLK_r:
-            app.repeatMode = (app.repeatMode + 1) % 3;
+            app.playback.setRepeatMode(
+                static_cast<RepeatMode>((static_cast<int>(app.playback.repeatMode()) + 1) % 3));
             break;
         default:
             break;

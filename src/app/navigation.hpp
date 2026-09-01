@@ -4,7 +4,7 @@
 
 void buildLibraryView(AppState& app);
 bool playTrack(AppState& app, size_t trackIndex, const std::vector<size_t>& queue,
-               int resumeSeconds = 0);
+               std::optional<size_t> sourcePosition = std::nullopt);
 void playAdjacentTrack(AppState& app, int direction);
 void selectCurrentItem(AppState& app);
 void navigateBack(AppState& app);

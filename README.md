@@ -14,7 +14,9 @@ development and handheld targets.
 - Play MP3, FLAC, WAV, and OGG through mpv
 - Display `cover.jpg`, `cover.png`, `folder.jpg`, or `folder.png` beside an album
 - Play/pause, seek, previous/next, shuffle, and repeat state
-- Restore the current track and exact mpv-reported position after the file is ready
+- Deterministic shuffle cycles, playback history, and three-second Previous behavior
+- Restore the queue, play order, history, and exact position in a paused state
+- Display loading, finished, and recoverable playback-error states
 - Keyboard and SDL game-controller navigation
 - In-app Dark and Light themes with persistent preferences
 
@@ -95,9 +97,13 @@ ctest --test-dir build --output-on-failure
 ```
 
 The test suite covers safe library discovery, cached groups, BOM-aware M3U playlists, atomic and
-validated Unicode state persistence, mpv command escaping, navigation history, scoped playback
-queues, and failed audio loads. Audio output and physical controls remain runtime checks because
-they depend on mpv, macOS CoreAudio, and the target handheld.
+validated Unicode session persistence, typed mpv events, navigation history, shuffle/repeat queue
+semantics, stale-load races, and failed audio loads. When mpv is installed, CTest also runs a real
+IPC integration test with a generated WAV fixture. Physical controls remain a runtime check on the
+target handheld.
+
+The vendored JSON decoder is nlohmann/json 3.12.0 under the MIT License; its license is stored next
+to the single-header dependency in `third_party/nlohmann/`.
 
 ## Hammer checkpoint
 

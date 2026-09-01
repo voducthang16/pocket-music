@@ -43,39 +43,35 @@ void buildLibraryView(AppState& app) {
                 {},
                 0,
                 0};
-    app.view.items = {{"Songs", countLabel(app.library.tracks().size(), "track", "tracks"),
-                       ViewAction::OpenSongs, app.library.allTrackIndexes()},
-                      {"Albums",
-                       countLabel(app.library.albums().size(), "album", "albums"),
-                       ViewAction::OpenAlbums,
-                       {}},
-                      {"Artists",
-                       countLabel(app.library.artists().size(), "artist", "artists"),
-                       ViewAction::OpenArtists,
-                       {}},
-                      {"Playlists",
-                       countLabel(app.library.playlists().size(), "playlist", "playlists"),
-                       ViewAction::OpenPlaylists,
-                       {}},
-                      {"Now Playing",
-                       app.currentTrack >= 0 ? "Open current track" : "Nothing playing",
-                       ViewAction::OpenNowPlaying,
-                       {}},
-                      {"Settings", "Appearance", ViewAction::OpenSettings, {}}};
+    app.view.items = {
+        {"Songs", countLabel(app.library.tracks().size(), "track", "tracks"), ViewAction::OpenSongs,
+         app.library.allTrackIndexes()},
+        {"Albums",
+         countLabel(app.library.albums().size(), "album", "albums"),
+         ViewAction::OpenAlbums,
+         {}},
+        {"Artists",
+         countLabel(app.library.artists().size(), "artist", "artists"),
+         ViewAction::OpenArtists,
+         {}},
+        {"Playlists",
+         countLabel(app.library.playlists().size(), "playlist", "playlists"),
+         ViewAction::OpenPlaylists,
+         {}},
+        {"Now Playing",
+         app.playback.snapshot().trackIndex ? "Open current track" : "Nothing playing",
+         ViewAction::OpenNowPlaying,
+         {}},
+        {"Settings", "Appearance", ViewAction::OpenSettings, {}}};
     app.history.clear();
 }
 
-bool playTrack(AppState& app, size_t trackIndex, const std::vector<size_t>& queue, int resume) {
-    if (trackIndex >= app.library.tracks().size() || queue.empty()) return false;
-    const auto position = std::find(queue.begin(), queue.end(), trackIndex);
-    if (position == queue.end()) return false;
-    if (!app.player->load(app.library.tracks()[trackIndex].path, resume)) {
-        app.message = app.player->error();
+bool playTrack(AppState& app, size_t trackIndex, const std::vector<size_t>& queue,
+               std::optional<size_t> sourcePosition) {
+    if (!app.playback.play(trackIndex, queue, sourcePosition, app.view.title)) {
+        app.message = app.playback.snapshot().errorMessage;
         return false;
     }
-    app.queue = queue;
-    app.queuePosition = static_cast<size_t>(position - queue.begin());
-    app.currentTrack = static_cast<int>(trackIndex);
     app.message.clear();
     if (app.view.screen != Screen::NowPlaying)
         pushView(app, {Screen::NowPlaying, "Now Playing", "POCKET MUSIC", {}, 0, 0});
@@ -83,26 +79,10 @@ bool playTrack(AppState& app, size_t trackIndex, const std::vector<size_t>& queu
 }
 
 void playAdjacentTrack(AppState& app, int direction) {
-    if (app.queue.empty()) return;
-    size_t next = app.queuePosition;
-    if (app.shuffle && app.queue.size() > 1) {
-        static std::mt19937 generator(std::random_device{}());
-        std::uniform_int_distribution<size_t> distribution(0, app.queue.size() - 2);
-        next = distribution(generator);
-        if (next >= app.queuePosition) ++next;
-    } else if (direction > 0) {
-        if (next + 1 >= app.queue.size()) {
-            if (app.repeatMode != 2) return;
-            next = 0;
-        } else {
-            ++next;
-        }
-    } else if (next == 0) {
-        next = app.repeatMode == 2 ? app.queue.size() - 1 : 0;
-    } else {
-        --next;
-    }
-    playTrack(app, app.queue[next], app.queue);
+    if (direction > 0)
+        app.playback.next();
+    else
+        app.playback.previous();
 }
 
 void selectCurrentItem(AppState& app) {
@@ -131,7 +111,7 @@ void selectCurrentItem(AppState& app) {
             return;
         }
         case ViewAction::OpenNowPlaying:
-            if (app.currentTrack >= 0)
+            if (app.playback.snapshot().trackIndex)
                 pushView(app, {Screen::NowPlaying, "Now Playing", "POCKET MUSIC", {}, 0, 0});
             return;
         case ViewAction::OpenSettings: {
@@ -157,7 +137,7 @@ void selectCurrentItem(AppState& app) {
         queue.reserve(app.view.items.size());
         for (const auto& row : app.view.items)
             if (!row.trackIndexes.empty()) queue.push_back(row.trackIndexes.front());
-        playTrack(app, item.trackIndexes.front(), queue);
+        playTrack(app, item.trackIndexes.front(), queue, selected);
     } else {
         pushView(app, tracksView(app, item.title, item.trackIndexes));
     }
@@ -173,9 +153,11 @@ void navigateBack(AppState& app) {
 }
 
 void advanceWhenFinished(AppState& app) {
-    if (!app.player->consumeEnded() || app.currentTrack < 0) return;
-    if (app.repeatMode == 1)
-        playTrack(app, static_cast<size_t>(app.currentTrack), app.queue);
-    else
-        playAdjacentTrack(app, 1);
+    app.playback.update();
+    if (app.playback.snapshot().phase == PlaybackPhase::Error)
+        app.message = app.playback.snapshot().errorMessage;
+    else if (app.playback.snapshot().phase == PlaybackPhase::Loading ||
+             app.playback.snapshot().phase == PlaybackPhase::Playing ||
+             app.playback.snapshot().phase == PlaybackPhase::Paused)
+        app.message.clear();
 }

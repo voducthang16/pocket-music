@@ -16,6 +16,9 @@ add_executable(pocket-music
   src/app/navigation.cpp
   src/core/atomic_file.cpp
   src/core/library.cpp
+  src/core/playback_controller.cpp
+  src/core/playback_queue.cpp
+  src/core/playback_session.cpp
   src/core/player.cpp
   src/core/state.cpp
   src/settings/preferences.cpp
@@ -25,7 +28,7 @@ add_executable(pocket-music
   src/ui/theme.cpp
 )
 
-target_include_directories(pocket-music PRIVATE src)
+target_include_directories(pocket-music PRIVATE src third_party)
 target_compile_options(pocket-music PRIVATE -Wall -Wextra -Wpedantic)
 target_link_libraries(pocket-music PRIVATE
   SDL2::SDL2
@@ -46,9 +49,13 @@ if(BUILD_TESTING)
     tests/test_navigation.cpp
     tests/test_player.cpp
     tests/test_preferences.cpp
+    tests/test_playback.cpp
     tests/test_state.cpp
     src/core/atomic_file.cpp
     src/core/library.cpp
+    src/core/playback_controller.cpp
+    src/core/playback_queue.cpp
+    src/core/playback_session.cpp
     src/core/player.cpp
     src/core/state.cpp
     src/settings/preferences.cpp
@@ -56,10 +63,21 @@ if(BUILD_TESTING)
     src/ui/primitives.cpp
     src/ui/theme.cpp
   )
-  target_include_directories(pocket-music-tests PRIVATE src)
+  target_include_directories(pocket-music-tests PRIVATE src third_party)
   target_compile_options(pocket-music-tests PRIVATE -Wall -Wextra -Wpedantic)
   target_link_libraries(pocket-music-tests PRIVATE TagLib::tag SDL2::SDL2 SDL2_ttf::SDL2_ttf)
 
   add_test(NAME unit COMMAND pocket-music-tests)
   add_test(NAME smoke COMMAND pocket-music --smoke-test --music ${CMAKE_SOURCE_DIR}/Music)
+
+  find_program(MPV_EXECUTABLE mpv)
+  if(MPV_EXECUTABLE)
+    add_executable(pocket-music-mpv-integration
+      tests/test_mpv_integration.cpp
+      src/core/player.cpp
+    )
+    target_include_directories(pocket-music-mpv-integration PRIVATE src third_party)
+    target_compile_options(pocket-music-mpv-integration PRIVATE -Wall -Wextra -Wpedantic)
+    add_test(NAME mpv-integration COMMAND pocket-music-mpv-integration)
+  endif()
 endif()

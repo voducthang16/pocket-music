@@ -7,6 +7,7 @@ int main() {
     addLibraryTests(tests);
     addStateTests(tests);
     addPlayerTests(tests);
+    addPlaybackTests(tests);
     addPreferencesTests(tests);
     addNavigationTests(tests);
     int failures = 0;

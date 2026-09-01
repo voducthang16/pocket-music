@@ -75,7 +75,9 @@ void drawCoverPlaceholder(AppState& app, const SDL_Rect& bounds) {
 void drawMiniPlayer(AppState& app) {
     const SDL_Rect panel{kPagePadding, layout::height - 150, layout::width - kPagePadding * 2, 118};
     fillRect(app.renderer, panel, app.theme.surfaceRaised);
-    if (app.currentTrack < 0) {
+    const auto playback = app.playback.snapshot();
+    const auto displayTrack = app.playback.displayTrackIndex();
+    if (!displayTrack) {
         drawText(app.renderer, app.bodyFont, "Choose a song to start", panel.x + 28, panel.y + 24,
                  app.theme.text, panel.w - 56);
         drawText(app.renderer, app.smallFont, "Your music stays offline", panel.x + 28,
@@ -83,7 +85,7 @@ void drawMiniPlayer(AppState& app) {
         return;
     }
 
-    const auto& track = app.library.tracks()[app.currentTrack];
+    const auto& track = app.library.tracks()[*displayTrack];
     const SDL_Rect art{panel.x + 10, panel.y + 10, 98, 98};
     if (SDL_Texture* texture = albumCover(app, track))
         drawCover(app.renderer, texture, art);
@@ -93,8 +95,8 @@ void drawMiniPlayer(AppState& app) {
              panel.w - 210);
     drawText(app.renderer, app.smallFont, track.artist, panel.x + 130, panel.y + 66,
              app.theme.textMuted, panel.w - 210);
-    drawPlayState(app.renderer, panel.x + panel.w - 54, panel.y + 49, app.player->snapshot().paused,
-                  app.theme.text);
+    drawPlayState(app.renderer, panel.x + panel.w - 54, panel.y + 49,
+                  playback.phase == PlaybackPhase::Paused, app.theme.text);
 }
 
 void drawLibrary(AppState& app) {
@@ -177,11 +179,13 @@ void drawList(AppState& app) {
 
 void drawNowPlaying(AppState& app) {
     drawTopBar(app, "Now Playing", "POCKET MUSIC");
-    if (app.currentTrack < 0 || app.currentTrack >= static_cast<int>(app.library.tracks().size())) {
+    const auto playback = app.playback.snapshot();
+    const auto displayTrack = app.playback.displayTrackIndex();
+    if (!displayTrack || *displayTrack >= app.library.tracks().size()) {
         drawEmptyState(app);
         return;
     }
-    const auto& track = app.library.tracks()[app.currentTrack];
+    const auto& track = app.library.tracks()[*displayTrack];
     const SDL_Rect art{layout::width / 2 - 220, 132, 440, 440};
     if (SDL_Texture* texture = albumCover(app, track))
         drawCover(app.renderer, texture, art);
@@ -195,7 +199,6 @@ void drawNowPlaying(AppState& app) {
     drawText(app.renderer, app.smallFont, track.album, layout::width / 2, 724, app.theme.textMuted,
              layout::width - 140, true);
 
-    const auto playback = app.player->snapshot();
     const int elapsed = std::max(0, static_cast<int>(playback.positionSeconds));
     const int duration = playback.durationSeconds > 0 ? static_cast<int>(playback.durationSeconds)
                                                       : track.durationSeconds;
@@ -210,12 +213,23 @@ void drawNowPlaying(AppState& app) {
 
     const SDL_Rect control{layout::width / 2 - 48, 894, 96, 96};
     fillRect(app.renderer, control, app.theme.surfaceRaised);
-    drawPlayState(app.renderer, control.x + 39, control.y + 39, playback.paused, app.theme.text);
-    if (app.shuffle)
+    drawPlayState(app.renderer, control.x + 39, control.y + 39,
+                  playback.phase == PlaybackPhase::Paused, app.theme.text);
+    if (app.playback.shuffle())
         drawText(app.renderer, app.smallFont, "SHUFFLE", 56, 925, app.theme.accent, 160);
-    if (app.repeatMode > 0)
-        drawText(app.renderer, app.smallFont, app.repeatMode == 1 ? "REPEAT 1" : "REPEAT", 555, 925,
+    if (app.playback.repeatMode() != RepeatMode::Off)
+        drawText(app.renderer, app.smallFont,
+                 app.playback.repeatMode() == RepeatMode::One ? "REPEAT 1" : "REPEAT", 555, 925,
                  app.theme.accent, 160);
+    if (playback.phase == PlaybackPhase::Loading)
+        drawText(app.renderer, app.smallFont, "Loading...", layout::width / 2, 990,
+                 app.theme.textMuted, 300, true);
+    else if (playback.phase == PlaybackPhase::Error)
+        drawText(app.renderer, app.smallFont, "Start: Retry   R1: Next", layout::width / 2, 990,
+                 app.theme.accent, 460, true);
+    else if (playback.phase == PlaybackPhase::Finished)
+        drawText(app.renderer, app.smallFont, "Queue finished", layout::width / 2, 990,
+                 app.theme.textMuted, 320, true);
 }
 }  // namespace
 

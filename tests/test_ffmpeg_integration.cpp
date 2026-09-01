@@ -7,6 +7,7 @@
 #include <iostream>
 #include <thread>
 
+#include "core/ffmpeg_audio_decoder.hpp"
 #include "core/ffmpeg_sdl_player.hpp"
 
 namespace fs = std::filesystem;
@@ -55,6 +56,15 @@ bool waitFor(FfmpegSdlPlayer& player, Predicate predicate, int timeoutMs = 4000)
     }
     return false;
 }
+
+bool decoderProducesCompletePcm(const fs::path& audio) {
+    FfmpegAudioDecoder decoder;
+    if (!decoder.open(audio)) return false;
+    std::vector<uint8_t> output;
+    while (decoder.read(output) == DecodeResult::Audio) {
+    }
+    return decoder.error().empty() && decoder.positionSeconds() >= 1.999;
+}
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -73,7 +83,8 @@ int main(int argc, char** argv) {
     const auto audio = externalFixture ? fs::path(argv[1]) : directory / "silence.wav";
     if (!externalFixture) writeSilentWav(audio);
 
-    int result = 0;
+    int result = decoderProducesCompletePcm(audio) ? 0 : 1;
+    if (result != 0) std::cerr << "FFmpeg decoder truncated PCM output\n";
     {
         FfmpegSdlPlayer player;
         const uint64_t generation = player.load(audio);
@@ -82,23 +93,20 @@ int main(int argc, char** argv) {
             })) {
             std::cerr << "FFmpeg backend did not load WAV: " << player.error() << '\n';
             result = 1;
-        } else if (externalFixture &&
-                   !waitFor(player, [](const PlayerEvent& event) {
+        } else if (externalFixture && !waitFor(player, [](const PlayerEvent& event) {
                        return event.type == PlayerEventType::PositionChanged && event.number > 0;
                    })) {
             std::cerr << "FFmpeg backend did not decode fixture audio\n";
             result = 1;
-        } else if (!player.setPaused(true) ||
-                   !waitFor(player, [](const PlayerEvent& event) {
+        } else if (!player.setPaused(true) || !waitFor(player, [](const PlayerEvent& event) {
                        return event.type == PlayerEventType::PauseChanged && event.flag;
                    })) {
             std::cerr << "FFmpeg backend did not pause\n";
             result = 1;
-        } else if (!externalFixture &&
-                   (!player.seekAbsolute(1.0) || !player.setPaused(false) ||
-                   !waitFor(player, [](const PlayerEvent& event) {
-                       return event.type == PlayerEventType::Ended;
-                   }))) {
+        } else if (!externalFixture && (!player.seekAbsolute(1.0) || !player.setPaused(false) ||
+                                        !waitFor(player, [](const PlayerEvent& event) {
+                                            return event.type == PlayerEventType::Ended;
+                                        }))) {
             std::cerr << "FFmpeg backend did not seek and finish\n";
             result = 1;
         }

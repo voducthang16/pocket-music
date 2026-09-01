@@ -63,6 +63,7 @@ add_executable(pocket-music
   src/app/application.cpp
   src/app/navigation.cpp
   src/core/atomic_file.cpp
+  src/core/ffmpeg_audio_decoder.cpp
   src/core/ffmpeg_sdl_player.cpp
   src/core/library.cpp
   src/core/playback_controller.cpp
@@ -131,6 +132,7 @@ if(BUILD_TESTING)
 
   add_executable(pocket-music-ffmpeg-integration
     tests/test_ffmpeg_integration.cpp
+    src/core/ffmpeg_audio_decoder.cpp
     src/core/ffmpeg_sdl_player.cpp
   )
   target_include_directories(pocket-music-ffmpeg-integration PRIVATE src)

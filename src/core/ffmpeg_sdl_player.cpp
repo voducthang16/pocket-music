@@ -1,29 +1,14 @@
 #include "core/ffmpeg_sdl_player.hpp"
 
-extern "C" {
-#include <libavcodec/avcodec.h>
-#include <libavformat/avformat.h>
-#include <libavutil/channel_layout.h>
-#include <libavutil/error.h>
-#include <libavutil/mathematics.h>
-#include <libswresample/swresample.h>
-}
-
 #include <algorithm>
 #include <chrono>
-#include <cmath>
 #include <thread>
 
-namespace {
-constexpr int kOutputRate = 48000;
-constexpr int kOutputChannels = 2;
-constexpr AVSampleFormat kOutputFormat = AV_SAMPLE_FMT_S16;
-constexpr Uint32 kMaximumQueuedBytes = kOutputRate * kOutputChannels * sizeof(int16_t) / 2;
+#include "core/ffmpeg_audio_decoder.hpp"
 
-std::string ffmpegError(int code) {
-    char message[AV_ERROR_MAX_STRING_SIZE]{};
-    return av_make_error_string(message, sizeof(message), code);
-}
+namespace {
+constexpr Uint32 kMaximumQueuedBytes =
+    FfmpegAudioDecoder::outputSampleRate * FfmpegAudioDecoder::outputChannels * sizeof(int16_t) / 2;
 }  // namespace
 
 FfmpegSdlPlayer::~FfmpegSdlPlayer() { stop(); }
@@ -107,80 +92,38 @@ void FfmpegSdlPlayer::stop() {
 }
 
 void FfmpegSdlPlayer::decode(std::filesystem::path path, uint64_t generation) {
-    AVFormatContext* format = nullptr;
-    AVCodecContext* codec = nullptr;
-    SwrContext* resampler = nullptr;
-    AVPacket* packet = nullptr;
-    AVFrame* frame = nullptr;
+    FfmpegAudioDecoder decoder;
     SDL_AudioDeviceID audioDevice = 0;
 
     const auto cleanup = [&] {
         if (audioDevice) SDL_CloseAudioDevice(audioDevice);
         device_ = 0;
-        av_frame_free(&frame);
-        av_packet_free(&packet);
-        swr_free(&resampler);
-        avcodec_free_context(&codec);
-        avformat_close_input(&format);
     };
     const auto failAndCleanup = [&](const std::string& message) {
         if (!stopping_) fail(generation, message);
         cleanup();
     };
 
-    int result = avformat_open_input(&format, path.c_str(), nullptr, nullptr);
-    if (result < 0) return failAndCleanup("Could not open audio: " + ffmpegError(result));
-    result = avformat_find_stream_info(format, nullptr);
-    if (result < 0) return failAndCleanup("Could not inspect audio: " + ffmpegError(result));
-
-    const AVCodec* decoder = nullptr;
-    const int streamIndex =
-        av_find_best_stream(format, AVMEDIA_TYPE_AUDIO, -1, -1, &decoder, 0);
-    if (streamIndex < 0 || !decoder)
-        return failAndCleanup("No supported audio stream: " + ffmpegError(streamIndex));
-
-    codec = avcodec_alloc_context3(decoder);
-    if (!codec) return failAndCleanup("Could not allocate audio decoder");
-    result = avcodec_parameters_to_context(codec, format->streams[streamIndex]->codecpar);
-    if (result < 0) return failAndCleanup("Could not configure decoder: " + ffmpegError(result));
-    result = avcodec_open2(codec, decoder, nullptr);
-    if (result < 0) return failAndCleanup("Could not start decoder: " + ffmpegError(result));
-
-    AVChannelLayout inputLayout = codec->ch_layout;
-    if (inputLayout.nb_channels == 0)
-        av_channel_layout_default(&inputLayout, codec->ch_layout.nb_channels > 0
-                                                    ? codec->ch_layout.nb_channels
-                                                    : 2);
-    const AVChannelLayout outputLayout = AV_CHANNEL_LAYOUT_STEREO;
-    result = swr_alloc_set_opts2(&resampler, &outputLayout, kOutputFormat, kOutputRate,
-                                 &inputLayout, codec->sample_fmt, codec->sample_rate, 0, nullptr);
-    if (result < 0 || swr_init(resampler) < 0)
-        return failAndCleanup("Could not configure audio conversion");
+    if (!decoder.open(path)) return failAndCleanup(decoder.error());
 
     SDL_AudioSpec desired{};
-    desired.freq = kOutputRate;
+    desired.freq = FfmpegAudioDecoder::outputSampleRate;
     desired.format = AUDIO_S16SYS;
-    desired.channels = kOutputChannels;
+    desired.channels = FfmpegAudioDecoder::outputChannels;
     desired.samples = 1024;
     audioDevice = SDL_OpenAudioDevice(nullptr, 0, &desired, nullptr, 0);
-    if (!audioDevice) return failAndCleanup("Could not open audio output: " + std::string(SDL_GetError()));
+    if (!audioDevice)
+        return failAndCleanup("Could not open audio output: " + std::string(SDL_GetError()));
     device_ = audioDevice;
 
-    packet = av_packet_alloc();
-    frame = av_frame_alloc();
-    if (!packet || !frame) return failAndCleanup("Could not allocate decode buffers");
-
-    const double duration = format->duration > 0
-                                ? static_cast<double>(format->duration) / AV_TIME_BASE
-                                : 0;
-    emit({PlayerEventType::DurationChanged, generation, duration});
-    emit({PlayerEventType::SeekableChanged, generation, 0, format->pb && format->pb->seekable});
+    emit({PlayerEventType::DurationChanged, generation, decoder.durationSeconds()});
+    emit({PlayerEventType::SeekableChanged, generation, 0, decoder.seekable()});
     emit({PlayerEventType::FileLoaded, generation});
     emit({PlayerEventType::PauseChanged, generation, 0, false});
     SDL_PauseAudioDevice(audioDevice, 0);
 
     double lastReportedPosition = -1;
-    bool reachedEnd = false;
+    DecodeResult decodeResult = DecodeResult::Audio;
     while (!stopping_) {
         std::optional<double> seek;
         {
@@ -188,17 +131,10 @@ void FfmpegSdlPlayer::decode(std::filesystem::path path, uint64_t generation) {
             seek.swap(pendingSeek_);
         }
         if (seek) {
-            const auto* stream = format->streams[streamIndex];
-            const int64_t timestamp = av_rescale_q(static_cast<int64_t>(*seek * AV_TIME_BASE),
-                                                   AV_TIME_BASE_Q, stream->time_base);
-            if (av_seek_frame(format, streamIndex, timestamp, AVSEEK_FLAG_BACKWARD) >= 0) {
-                avcodec_flush_buffers(codec);
-                swr_close(resampler);
-                swr_init(resampler);
+            if (decoder.seek(*seek)) {
                 SDL_ClearQueuedAudio(audioDevice);
                 positionSeconds_ = *seek;
                 emit({PlayerEventType::PositionChanged, generation, *seek});
-                reachedEnd = false;
             }
         }
         if (paused_) {
@@ -209,48 +145,22 @@ void FfmpegSdlPlayer::decode(std::filesystem::path path, uint64_t generation) {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
             continue;
         }
-        result = av_read_frame(format, packet);
-        if (result < 0) {
-            reachedEnd = true;
-            break;
+        std::vector<uint8_t> output;
+        decodeResult = decoder.read(output);
+        if (decodeResult == DecodeResult::Failed) return failAndCleanup(decoder.error());
+        if (decodeResult == DecodeResult::End) break;
+        if (SDL_QueueAudio(audioDevice, output.data(), static_cast<Uint32>(output.size())) < 0)
+            return failAndCleanup("Could not queue audio: " + std::string(SDL_GetError()));
+        positionSeconds_ = decoder.positionSeconds();
+        if (positionSeconds_.load() - lastReportedPosition >= 0.25) {
+            lastReportedPosition = positionSeconds_.load();
+            emit({PlayerEventType::PositionChanged, generation, lastReportedPosition});
         }
-        if (packet->stream_index != streamIndex) {
-            av_packet_unref(packet);
-            continue;
-        }
-        result = avcodec_send_packet(codec, packet);
-        av_packet_unref(packet);
-        if (result < 0) return failAndCleanup("Could not decode audio: " + ffmpegError(result));
-
-        while (!stopping_ && (result = avcodec_receive_frame(codec, frame)) >= 0) {
-            const int outputSamples = av_rescale_rnd(
-                swr_get_delay(resampler, codec->sample_rate) + frame->nb_samples, kOutputRate,
-                codec->sample_rate, AV_ROUND_UP);
-            std::vector<uint8_t> output(static_cast<size_t>(outputSamples) * kOutputChannels *
-                                        sizeof(int16_t));
-            uint8_t* outputData[] = {output.data()};
-            const int converted = swr_convert(resampler, outputData, outputSamples,
-                                              const_cast<const uint8_t**>(frame->extended_data),
-                                              frame->nb_samples);
-            if (converted < 0)
-                return failAndCleanup("Could not convert audio: " + ffmpegError(converted));
-            output.resize(static_cast<size_t>(converted) * kOutputChannels * sizeof(int16_t));
-            if (SDL_QueueAudio(audioDevice, output.data(), static_cast<Uint32>(output.size())) < 0)
-                return failAndCleanup("Could not queue audio: " + std::string(SDL_GetError()));
-            positionSeconds_ = positionSeconds_.load() +
-                               static_cast<double>(converted) / kOutputRate;
-            if (positionSeconds_.load() - lastReportedPosition >= 0.25) {
-                lastReportedPosition = positionSeconds_.load();
-                emit({PlayerEventType::PositionChanged, generation, lastReportedPosition});
-            }
-            av_frame_unref(frame);
-        }
-        if (result != AVERROR(EAGAIN) && result != AVERROR_EOF)
-            return failAndCleanup("Could not receive decoded audio: " + ffmpegError(result));
     }
 
-    while (!stopping_ && reachedEnd && SDL_GetQueuedAudioSize(audioDevice) > 0)
+    while (!stopping_ && decodeResult == DecodeResult::End &&
+           SDL_GetQueuedAudioSize(audioDevice) > 0)
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    if (!stopping_ && reachedEnd) emit({PlayerEventType::Ended, generation});
+    if (!stopping_ && decodeResult == DecodeResult::End) emit({PlayerEventType::Ended, generation});
     cleanup();
 }

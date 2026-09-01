@@ -3,13 +3,16 @@
 #include <algorithm>
 #include <random>
 
+#include "ui/primitives.hpp"
+#include "ui/theme.hpp"
+
 namespace {
 std::string countLabel(size_t count, const char* singular, const char* plural) {
     return std::to_string(count) + ' ' + (count == 1 ? singular : plural);
 }
 
 ViewItem trackItem(const Track& track, size_t index) {
-    return {track.title, track.artist, {index}};
+    return {track.title, track.artist, ViewAction::None, {index}};
 }
 
 ViewState tracksView(const AppState& app, std::string title, std::vector<size_t> indexes) {
@@ -28,7 +31,7 @@ void showGroups(AppState& app, Screen screen, const std::string& title,
                 const std::vector<TrackGroup>& groups) {
     ViewState view{screen, title, "LIBRARY", {}, 0, 0};
     for (const auto& group : groups)
-        view.items.push_back({group.title, group.subtitle, group.trackIndexes});
+        view.items.push_back({group.title, group.subtitle, ViewAction::None, group.trackIndexes});
     pushView(app, std::move(view));
 }
 }  // namespace
@@ -40,13 +43,25 @@ void buildLibraryView(AppState& app) {
                 {},
                 0,
                 0};
-    app.view.items = {
-        {"Songs", countLabel(app.library.tracks().size(), "track", "tracks"),
-         app.library.allTrackIndexes()},
-        {"Albums", countLabel(app.library.albums().size(), "album", "albums"), {}},
-        {"Artists", countLabel(app.library.artists().size(), "artist", "artists"), {}},
-        {"Playlists", countLabel(app.library.playlists().size(), "playlist", "playlists"), {}},
-        {"Now Playing", app.currentTrack >= 0 ? "Open current track" : "Nothing playing", {}}};
+    app.view.items = {{"Songs", countLabel(app.library.tracks().size(), "track", "tracks"),
+                       ViewAction::OpenSongs, app.library.allTrackIndexes()},
+                      {"Albums",
+                       countLabel(app.library.albums().size(), "album", "albums"),
+                       ViewAction::OpenAlbums,
+                       {}},
+                      {"Artists",
+                       countLabel(app.library.artists().size(), "artist", "artists"),
+                       ViewAction::OpenArtists,
+                       {}},
+                      {"Playlists",
+                       countLabel(app.library.playlists().size(), "playlist", "playlists"),
+                       ViewAction::OpenPlaylists,
+                       {}},
+                      {"Now Playing",
+                       app.currentTrack >= 0 ? "Open current track" : "Nothing playing",
+                       ViewAction::OpenNowPlaying,
+                       {}},
+                      {"Settings", "Appearance", ViewAction::OpenSettings, {}}};
     app.history.clear();
 }
 
@@ -95,34 +110,48 @@ void selectCurrentItem(AppState& app) {
         app.view.selected >= static_cast<int>(app.view.items.size()))
         return;
     const auto selected = static_cast<size_t>(app.view.selected);
-    if (app.view.screen == Screen::Library) {
-        switch (selected) {
-            case 0:
-                pushView(app, tracksView(app, "Songs", app.library.allTrackIndexes()));
-                break;
-            case 1:
-                showGroups(app, Screen::Albums, "Albums", app.library.albums());
-                break;
-            case 2:
-                showGroups(app, Screen::Artists, "Artists", app.library.artists());
-                break;
-            case 3: {
-                ViewState view{Screen::Playlists, "Playlists", "LIBRARY", {}, 0, 0};
-                for (const auto& playlist : app.library.playlists())
-                    view.items.push_back(
-                        {playlist.name, countLabel(playlist.trackIndexes.size(), "track", "tracks"),
-                         playlist.trackIndexes});
-                pushView(app, std::move(view));
-                break;
-            }
-            case 4:
-                if (app.currentTrack >= 0)
-                    pushView(app, {Screen::NowPlaying, "Now Playing", "POCKET MUSIC", {}, 0, 0});
-                break;
-        }
-        return;
-    }
     const auto& item = app.view.items[selected];
+    switch (item.action) {
+        case ViewAction::OpenSongs:
+            pushView(app, tracksView(app, "Songs", app.library.allTrackIndexes()));
+            return;
+        case ViewAction::OpenAlbums:
+            showGroups(app, Screen::Albums, "Albums", app.library.albums());
+            return;
+        case ViewAction::OpenArtists:
+            showGroups(app, Screen::Artists, "Artists", app.library.artists());
+            return;
+        case ViewAction::OpenPlaylists: {
+            ViewState view{Screen::Playlists, "Playlists", "LIBRARY", {}, 0, 0};
+            for (const auto& playlist : app.library.playlists())
+                view.items.push_back({playlist.name,
+                                      countLabel(playlist.trackIndexes.size(), "track", "tracks"),
+                                      ViewAction::None, playlist.trackIndexes});
+            pushView(app, std::move(view));
+            return;
+        }
+        case ViewAction::OpenNowPlaying:
+            if (app.currentTrack >= 0)
+                pushView(app, {Screen::NowPlaying, "Now Playing", "POCKET MUSIC", {}, 0, 0});
+            return;
+        case ViewAction::OpenSettings: {
+            const auto selectedTheme = app.preferences.theme == ThemeMode::Dark ? "Dark" : "Light";
+            ViewState settings{Screen::Settings, "Settings", "APPEARANCE", {}, 0, 0};
+            settings.items.push_back({"Theme", selectedTheme, ViewAction::ToggleTheme, {}});
+            pushView(app, std::move(settings));
+            return;
+        }
+        case ViewAction::ToggleTheme:
+            app.preferences.theme =
+                app.preferences.theme == ThemeMode::Dark ? ThemeMode::Light : ThemeMode::Dark;
+            app.theme = resolveTheme(app.preferences.theme);
+            app.view.items[selected].subtitle =
+                app.preferences.theme == ThemeMode::Dark ? "Dark" : "Light";
+            clearTextCache();
+            return;
+        case ViewAction::None:
+            break;
+    }
     if (app.view.screen == Screen::Tracks) {
         std::vector<size_t> queue;
         queue.reserve(app.view.items.size());

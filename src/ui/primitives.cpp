@@ -4,8 +4,6 @@
 #include <map>
 #include <tuple>
 
-#include "ui/theme.hpp"
-
 namespace {
 struct CachedText {
     SDL_Texture* texture = nullptr;

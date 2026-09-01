@@ -67,8 +67,31 @@ void failedLoad() {
             "load failure must not mutate navigation or queue state");
     require(!app.message.empty(), "load failure must be visible to the UI state");
 }
+
+void themeSettingsUseNavigationStack() {
+    TemporaryDirectory temporary;
+    const auto music = temporary.path / "Music";
+    touch(music / "Song.mp3");
+    AppState app(music, std::make_unique<FakePlayer>());
+    require(app.library.scan(), "settings fixture must scan");
+    buildLibraryView(app);
+    app.view.selected = 5;
+    selectCurrentItem(app);
+    require(app.view.screen == Screen::Settings && app.history.size() == 1,
+            "Settings must open through the navigation stack");
+    require(app.view.items.front().subtitle == "Dark", "Settings must show the active theme");
+    selectCurrentItem(app);
+    require(app.preferences.theme == ThemeMode::Light,
+            "selecting Theme must update preferences immediately");
+    require(app.view.items.front().subtitle == "Light",
+            "theme value must update without reopening Settings");
+    navigateBack(app);
+    require(app.view.screen == Screen::Library && app.view.selected == 5,
+            "Back must restore the selected Settings row in Library");
+}
 }  // namespace
 void addNavigationTests(TestCases& tests) {
     tests.emplace_back("navigation queue", navigationQueue);
     tests.emplace_back("failed load", failedLoad);
+    tests.emplace_back("theme settings", themeSettingsUseNavigationStack);
 }

@@ -28,15 +28,15 @@ std::string countLabel(size_t count, const char* singular, const char* plural) {
 }
 
 void drawTopBar(AppState& app, const std::string& title, const std::string& eyebrow = {}) {
-    fillRect(app.renderer, {0, 0, layout::width, kTopBarHeight}, theme::background);
+    fillRect(app.renderer, {0, 0, layout::width, kTopBarHeight}, app.theme.background);
     if (!eyebrow.empty()) {
-        drawText(app.renderer, app.smallFont, eyebrow, kPagePadding, 20, theme::textMuted,
+        drawText(app.renderer, app.smallFont, eyebrow, kPagePadding, 20, app.theme.textMuted,
                  layout::width - kPagePadding * 2);
     }
     drawText(app.renderer, app.titleFont, title, kPagePadding, eyebrow.empty() ? 25 : 47,
-             theme::text, layout::width - kPagePadding * 2);
+             app.theme.text, layout::width - kPagePadding * 2);
     fillRect(app.renderer, {kPagePadding, kTopBarHeight - 1, layout::width - kPagePadding * 2, 1},
-             theme::divider);
+             app.theme.divider);
 }
 
 SDL_Texture* albumCover(AppState& app, const Track& track) {
@@ -63,23 +63,23 @@ void drawCover(SDL_Renderer* renderer, SDL_Texture* texture, const SDL_Rect& bou
 }
 
 void drawCoverPlaceholder(AppState& app, const SDL_Rect& bounds) {
-    fillRect(app.renderer, bounds, theme::surfaceRaised);
+    fillRect(app.renderer, bounds, app.theme.surfaceRaised);
     const int centerX = bounds.x + bounds.w / 2;
     const int centerY = bounds.y + bounds.h / 2;
     fillRect(app.renderer,
              {centerX - bounds.w / 5, centerY - bounds.h / 5, bounds.w * 2 / 5, bounds.h * 2 / 5},
-             theme::accentSoft);
-    drawPlayState(app.renderer, centerX - 9, centerY - 9, false, theme::accent);
+             app.theme.accentSoft);
+    drawPlayState(app.renderer, centerX - 9, centerY - 9, false, app.theme.accent);
 }
 
 void drawMiniPlayer(AppState& app) {
     const SDL_Rect panel{kPagePadding, layout::height - 150, layout::width - kPagePadding * 2, 118};
-    fillRect(app.renderer, panel, theme::surfaceRaised);
+    fillRect(app.renderer, panel, app.theme.surfaceRaised);
     if (app.currentTrack < 0) {
         drawText(app.renderer, app.bodyFont, "Choose a song to start", panel.x + 28, panel.y + 24,
-                 theme::text, panel.w - 56);
+                 app.theme.text, panel.w - 56);
         drawText(app.renderer, app.smallFont, "Your music stays offline", panel.x + 28,
-                 panel.y + 69, theme::textMuted, panel.w - 56);
+                 panel.y + 69, app.theme.textMuted, panel.w - 56);
         return;
     }
 
@@ -89,12 +89,12 @@ void drawMiniPlayer(AppState& app) {
         drawCover(app.renderer, texture, art);
     else
         drawCoverPlaceholder(app, art);
-    drawText(app.renderer, app.bodyFont, track.title, panel.x + 130, panel.y + 20, theme::text,
+    drawText(app.renderer, app.bodyFont, track.title, panel.x + 130, panel.y + 20, app.theme.text,
              panel.w - 210);
     drawText(app.renderer, app.smallFont, track.artist, panel.x + 130, panel.y + 66,
-             theme::textMuted, panel.w - 210);
+             app.theme.textMuted, panel.w - 210);
     drawPlayState(app.renderer, panel.x + panel.w - 54, panel.y + 49, app.player->snapshot().paused,
-                  theme::text);
+                  app.theme.text);
 }
 
 void drawLibrary(AppState& app) {
@@ -108,16 +108,16 @@ void drawLibrary(AppState& app) {
         if (active) {
             fillRect(app.renderer,
                      {kPagePadding, y, layout::width - kPagePadding * 2, kLibraryRowHeight - 8},
-                     theme::surfaceRaised);
+                     app.theme.surfaceRaised);
             fillRect(app.renderer, {kPagePadding, y + 15, 5, kLibraryRowHeight - 38},
-                     theme::accent);
+                     app.theme.accent);
         }
         drawText(app.renderer, app.bodyFont, items[index].title, kPagePadding + 26, y + 14,
-                 theme::text, layout::width - 210);
+                 app.theme.text, layout::width - 210);
         drawText(app.renderer, app.smallFont, items[index].subtitle, kPagePadding + 26, y + 59,
-                 theme::textMuted, layout::width - 210);
+                 app.theme.textMuted, layout::width - 210);
         drawChevron(app.renderer, layout::width - kPagePadding - 24, y + 47,
-                    active ? theme::accent : theme::textMuted);
+                    active ? app.theme.accent : app.theme.textMuted);
     }
     drawMiniPlayer(app);
 }
@@ -133,10 +133,10 @@ const Track* trackForListRow(const AppState& app, int index) {
 void drawEmptyState(AppState& app) {
     const SDL_Rect art{layout::width / 2 - 70, 280, 140, 140};
     drawCoverPlaceholder(app, art);
-    drawText(app.renderer, app.bodyFont, "Nothing here yet", layout::width / 2, 458, theme::text,
+    drawText(app.renderer, app.bodyFont, "Nothing here yet", layout::width / 2, 458, app.theme.text,
              560, true);
     drawText(app.renderer, app.smallFont, "Add music to the Music folder", layout::width / 2, 510,
-             theme::textMuted, 620, true);
+             app.theme.textMuted, 620, true);
 }
 
 void drawList(AppState& app) {
@@ -158,20 +158,20 @@ void drawList(AppState& app) {
         const bool active = index == app.view.selected;
         if (active) {
             fillRect(app.renderer, {24, y, layout::width - 48, kTrackRowHeight - 4},
-                     theme::surfaceRaised);
-            fillRect(app.renderer, {24, y + 13, 5, kTrackRowHeight - 30}, theme::accent);
+                     app.theme.surfaceRaised);
+            fillRect(app.renderer, {24, y + 13, 5, kTrackRowHeight - 30}, app.theme.accent);
         }
-        drawText(app.renderer, app.bodyFont, items[index].title, 52, y + 10, theme::text,
+        drawText(app.renderer, app.bodyFont, items[index].title, 52, y + 10, app.theme.text,
                  layout::width - 135);
         if (const Track* track = trackForListRow(app, index)) {
             drawText(app.renderer, app.smallFont,
                      track->artist + "  -  " + formatDuration(track->durationSeconds), 52, y + 54,
-                     theme::textMuted, layout::width - 135);
+                     app.theme.textMuted, layout::width - 135);
         }
         drawChevron(app.renderer, layout::width - 48, y + 43,
-                    active ? theme::accent : theme::textMuted);
+                    active ? app.theme.accent : app.theme.textMuted);
         fillRect(app.renderer, {52, y + kTrackRowHeight - 5, layout::width - 100, 1},
-                 theme::divider);
+                 app.theme.divider);
     }
 }
 
@@ -189,10 +189,10 @@ void drawNowPlaying(AppState& app) {
         drawCoverPlaceholder(app, art);
 
     drawMarqueeText(app.renderer, app.titleFont, track.title, {48, 612, layout::width - 96, 54},
-                    theme::text, SDL_GetTicks64());
-    drawText(app.renderer, app.bodyFont, track.artist, layout::width / 2, 674, theme::textMuted,
+                    app.theme.text, SDL_GetTicks64());
+    drawText(app.renderer, app.bodyFont, track.artist, layout::width / 2, 674, app.theme.textMuted,
              layout::width - 120, true);
-    drawText(app.renderer, app.smallFont, track.album, layout::width / 2, 724, theme::textMuted,
+    drawText(app.renderer, app.smallFont, track.album, layout::width / 2, 724, app.theme.textMuted,
              layout::width - 140, true);
 
     const auto playback = app.player->snapshot();
@@ -202,24 +202,25 @@ void drawNowPlaying(AppState& app) {
     const int total = std::max(1, duration);
     const int progressWidth = layout::width - 112;
     const int filled = std::min(progressWidth, progressWidth * elapsed / total);
-    fillRect(app.renderer, {56, 806, progressWidth, 8}, theme::surfaceRaised);
-    fillRect(app.renderer, {56, 806, filled, 8}, theme::accent);
-    drawText(app.renderer, app.smallFont, formatDuration(elapsed), 56, 830, theme::textMuted);
+    fillRect(app.renderer, {56, 806, progressWidth, 8}, app.theme.surfaceRaised);
+    fillRect(app.renderer, {56, 806, filled, 8}, app.theme.accent);
+    drawText(app.renderer, app.smallFont, formatDuration(elapsed), 56, 830, app.theme.textMuted);
     drawText(app.renderer, app.smallFont, formatDuration(duration), layout::width - 124, 830,
-             theme::textMuted);
+             app.theme.textMuted);
 
     const SDL_Rect control{layout::width / 2 - 48, 894, 96, 96};
-    fillRect(app.renderer, control, theme::surfaceRaised);
-    drawPlayState(app.renderer, control.x + 39, control.y + 39, playback.paused, theme::text);
-    if (app.shuffle) drawText(app.renderer, app.smallFont, "SHUFFLE", 56, 925, theme::accent, 160);
+    fillRect(app.renderer, control, app.theme.surfaceRaised);
+    drawPlayState(app.renderer, control.x + 39, control.y + 39, playback.paused, app.theme.text);
+    if (app.shuffle)
+        drawText(app.renderer, app.smallFont, "SHUFFLE", 56, 925, app.theme.accent, 160);
     if (app.repeatMode > 0)
         drawText(app.renderer, app.smallFont, app.repeatMode == 1 ? "REPEAT 1" : "REPEAT", 555, 925,
-                 theme::accent, 160);
+                 app.theme.accent, 160);
 }
 }  // namespace
 
 void renderApp(AppState& app) {
-    fillRect(app.renderer, {0, 0, layout::width, layout::height}, theme::background);
+    fillRect(app.renderer, {0, 0, layout::width, layout::height}, app.theme.background);
     if (app.view.screen == Screen::Library)
         drawLibrary(app);
     else if (app.view.screen == Screen::NowPlaying)
@@ -228,9 +229,9 @@ void renderApp(AppState& app) {
         drawList(app);
     if (!app.message.empty()) {
         const SDL_Rect banner{40, layout::height - 88, layout::width - 80, 56};
-        fillRect(app.renderer, banner, theme::surfaceRaised);
+        fillRect(app.renderer, banner, app.theme.surfaceRaised);
         drawText(app.renderer, app.smallFont, app.message, banner.x + 18, banner.y + 12,
-                 theme::accent, banner.w - 36);
+                 app.theme.accent, banner.w - 36);
     }
     SDL_RenderPresent(app.renderer);
 }

@@ -16,6 +16,7 @@ development and handheld targets.
 - Play/pause, seek, previous/next, shuffle, and repeat state
 - Restore the current track and exact mpv-reported position after the file is ready
 - Keyboard and SDL game-controller navigation
+- In-app Dark and Light themes with persistent preferences
 
 Embedded cover art and the final Hammer launcher/button map belong to the hardware-validation checkpoint.
 
@@ -57,6 +58,9 @@ Put music under `Music/`, or point at another directory:
 ./build/pocket-music --music "/path/to/Music"
 ./build/pocket-music --music "/path/to/Music" --fullscreen
 ```
+
+Pocket Music stores appearance preferences separately from playback state. Use
+`--preferences "/path/to/preferences"` to override the default preferences file.
 
 ## Controls
 

@@ -12,12 +12,25 @@
 #include "core/library.hpp"
 #include "core/player.hpp"
 #include "core/state.hpp"
+#include "settings/preferences.hpp"
+#include "ui/theme.hpp"
 
-enum class Screen { Library, Albums, Artists, Playlists, Tracks, NowPlaying };
+enum class Screen { Library, Albums, Artists, Playlists, Tracks, NowPlaying, Settings };
+enum class ViewAction {
+    None,
+    OpenSongs,
+    OpenAlbums,
+    OpenArtists,
+    OpenPlaylists,
+    OpenNowPlaying,
+    OpenSettings,
+    ToggleTheme
+};
 
 struct ViewItem {
     std::string title;
     std::string subtitle;
+    ViewAction action = ViewAction::None;
     std::vector<size_t> trackIndexes;
 };
 
@@ -39,6 +52,8 @@ struct AppState {
     MusicLibrary library;
     std::unique_ptr<AudioPlayer> player;
     SavedState saved;
+    AppPreferences preferences;
+    ThemePalette theme = resolveTheme(ThemeMode::Dark);
     ViewState view;
     std::vector<ViewState> history;
     std::vector<size_t> queue;

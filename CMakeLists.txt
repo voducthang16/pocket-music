@@ -14,12 +14,15 @@ add_executable(pocket-music
   src/main.cpp
   src/app/application.cpp
   src/app/navigation.cpp
+  src/core/atomic_file.cpp
   src/core/library.cpp
   src/core/player.cpp
   src/core/state.cpp
+  src/settings/preferences.cpp
   src/ui/input.cpp
   src/ui/primitives.cpp
   src/ui/renderer.cpp
+  src/ui/theme.cpp
 )
 
 target_include_directories(pocket-music PRIVATE src)
@@ -42,11 +45,16 @@ if(BUILD_TESTING)
     tests/test_library.cpp
     tests/test_navigation.cpp
     tests/test_player.cpp
+    tests/test_preferences.cpp
     tests/test_state.cpp
+    src/core/atomic_file.cpp
     src/core/library.cpp
     src/core/player.cpp
     src/core/state.cpp
+    src/settings/preferences.cpp
     src/app/navigation.cpp
+    src/ui/primitives.cpp
+    src/ui/theme.cpp
   )
   target_include_directories(pocket-music-tests PRIVATE src)
   target_compile_options(pocket-music-tests PRIVATE -Wall -Wextra -Wpedantic)

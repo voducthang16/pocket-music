@@ -105,8 +105,10 @@ void destroyUi(AppState& app) {
 }  // namespace
 
 int runApplication(const std::filesystem::path& musicPath, const std::filesystem::path& statePath,
-                   bool fullscreen) {
+                   const std::filesystem::path& preferencesPath, bool fullscreen) {
     AppState app(musicPath);
+    app.preferences = loadPreferences(preferencesPath);
+    app.theme = resolveTheme(app.preferences.theme);
     if (!app.library.scan()) {
         std::cerr << "Music scan failed: " << app.library.error() << '\n';
         app.message = app.library.error();
@@ -151,6 +153,8 @@ int runApplication(const std::filesystem::path& musicPath, const std::filesystem
         SDL_Delay(16);
     }
     persist(app, statePath);
+    if (!savePreferences(preferencesPath, app.preferences))
+        std::cerr << "Could not save app preferences\n";
     destroyUi(app);
     return 0;
 }

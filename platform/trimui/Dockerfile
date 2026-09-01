@@ -22,9 +22,47 @@ RUN cmake -S /tmp/taglib -B /tmp/taglib-build \
     && cmake --build /tmp/taglib-build -j4 \
     && cmake --install /tmp/taglib-build
 
+FROM ghcr.io/loveretro/tg5040-toolchain:latest AS ffmpeg
+
+ARG FFMPEG_COMMIT=894da5ca7d742e4429ffb2af534fcda0103ef593
+
+RUN git init /tmp/ffmpeg \
+    && git -C /tmp/ffmpeg remote add origin https://git.ffmpeg.org/ffmpeg.git \
+    && git -C /tmp/ffmpeg fetch --depth 1 origin ${FFMPEG_COMMIT} \
+    && git -C /tmp/ffmpeg checkout --detach FETCH_HEAD
+
+RUN cd /tmp/ffmpeg \
+    && ./configure \
+      --prefix=/opt/pocket-music-deps \
+      --arch=aarch64 \
+      --target-os=linux \
+      --cross-prefix=${CROSS_COMPILE} \
+      --enable-cross-compile \
+      --enable-static \
+      --disable-shared \
+      --disable-programs \
+      --disable-doc \
+      --disable-debug \
+      --disable-autodetect \
+      --disable-network \
+      --disable-avdevice \
+      --disable-avfilter \
+      --disable-everything \
+      --enable-avformat \
+      --enable-avcodec \
+      --enable-avutil \
+      --enable-swresample \
+      --enable-protocol=file \
+      --enable-demuxer=flac,mp3,ogg,wav \
+      --enable-decoder=flac,mp3,opus,pcm_s16le,pcm_s24le,pcm_s32le,pcm_u8,vorbis \
+      --enable-parser=flac,mpegaudio,opus,vorbis \
+    && make -j4 \
+    && make install
+
 FROM ghcr.io/loveretro/tg5040-toolchain:latest AS app
 
 COPY --from=taglib /opt/pocket-music-deps /opt/pocket-music-deps
+COPY --from=ffmpeg /opt/pocket-music-deps /opt/pocket-music-deps
 COPY . /src
 
 RUN cmake -S /src -B /tmp/pocket-music-build \

@@ -120,7 +120,7 @@ void rapidControlsRemainCumulative() {
     fixture.controller->togglePause();
     fixture.controller->seekRelative(10);
     fixture.controller->seekRelative(10);
-    require(fixture.player->toggleCount == 2, "rapid pause toggles must both reach mpv");
+    require(fixture.player->toggleCount == 2, "rapid pause toggles must both reach the player");
     require(fixture.player->relativeSeeks == std::vector<int>({10, 10}),
             "rapid relative seeks must remain cumulative commands");
 }

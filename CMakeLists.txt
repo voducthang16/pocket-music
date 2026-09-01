@@ -43,16 +43,31 @@ endif()
 find_package(TagLib CONFIG REQUIRED)
 find_package(Threads REQUIRED)
 
+find_path(FFMPEG_INCLUDE_DIR libavformat/avformat.h
+  HINTS /opt/homebrew/opt/ffmpeg/include
+  REQUIRED
+)
+find_library(AVFORMAT_LIBRARY avformat HINTS /opt/homebrew/opt/ffmpeg/lib REQUIRED)
+find_library(AVCODEC_LIBRARY avcodec HINTS /opt/homebrew/opt/ffmpeg/lib REQUIRED)
+find_library(AVUTIL_LIBRARY avutil HINTS /opt/homebrew/opt/ffmpeg/lib REQUIRED)
+find_library(SWRESAMPLE_LIBRARY swresample HINTS /opt/homebrew/opt/ffmpeg/lib REQUIRED)
+add_library(FFmpeg::audio INTERFACE IMPORTED)
+set_target_properties(FFmpeg::audio PROPERTIES
+  INTERFACE_INCLUDE_DIRECTORIES "${FFMPEG_INCLUDE_DIR}"
+  INTERFACE_LINK_LIBRARIES
+    "${AVFORMAT_LIBRARY};${AVCODEC_LIBRARY};${SWRESAMPLE_LIBRARY};${AVUTIL_LIBRARY}"
+)
+
 add_executable(pocket-music
   src/main.cpp
   src/app/application.cpp
   src/app/navigation.cpp
   src/core/atomic_file.cpp
+  src/core/ffmpeg_sdl_player.cpp
   src/core/library.cpp
   src/core/playback_controller.cpp
   src/core/playback_queue.cpp
   src/core/playback_session.cpp
-  src/core/player.cpp
   src/core/state.cpp
   src/settings/preferences.cpp
   src/ui/input.cpp
@@ -61,17 +76,19 @@ add_executable(pocket-music
   src/ui/theme.cpp
 )
 
-target_include_directories(pocket-music PRIVATE src third_party)
+target_include_directories(pocket-music PRIVATE src)
 target_compile_options(pocket-music PRIVATE -Wall -Wextra -Wpedantic)
 target_link_libraries(pocket-music PRIVATE
   SDL2::SDL2
   SDL2_ttf::SDL2_ttf
   SDL2_image::SDL2_image
+  FFmpeg::audio
   TagLib::tag
   Threads::Threads
 )
 
 if(POCKET_MUSIC_TRIMUI)
+  target_sources(pocket-music PRIVATE platform/trimui/fcntl_compat.cpp)
   target_link_libraries(pocket-music PRIVATE stdc++fs)
 endif()
 
@@ -85,7 +102,6 @@ if(BUILD_TESTING)
     tests/test_main.cpp
     tests/test_library.cpp
     tests/test_navigation.cpp
-    tests/test_player.cpp
     tests/test_preferences.cpp
     tests/test_playback.cpp
     tests/test_state.cpp
@@ -94,7 +110,6 @@ if(BUILD_TESTING)
     src/core/playback_controller.cpp
     src/core/playback_queue.cpp
     src/core/playback_session.cpp
-    src/core/player.cpp
     src/core/state.cpp
     src/settings/preferences.cpp
     src/app/navigation.cpp
@@ -102,7 +117,7 @@ if(BUILD_TESTING)
     src/ui/input.cpp
     src/ui/theme.cpp
   )
-  target_include_directories(pocket-music-tests PRIVATE src third_party)
+  target_include_directories(pocket-music-tests PRIVATE src)
   target_compile_options(pocket-music-tests PRIVATE -Wall -Wextra -Wpedantic)
   target_link_libraries(pocket-music-tests PRIVATE
     TagLib::tag
@@ -114,15 +129,16 @@ if(BUILD_TESTING)
   add_test(NAME unit COMMAND pocket-music-tests)
   add_test(NAME smoke COMMAND pocket-music --smoke-test --music ${CMAKE_SOURCE_DIR}/Music)
 
-  find_program(MPV_EXECUTABLE mpv)
-  if(MPV_EXECUTABLE)
-    add_executable(pocket-music-mpv-integration
-      tests/test_mpv_integration.cpp
-      src/core/player.cpp
-    )
-    target_include_directories(pocket-music-mpv-integration PRIVATE src third_party)
-    target_compile_options(pocket-music-mpv-integration PRIVATE -Wall -Wextra -Wpedantic)
-    target_link_libraries(pocket-music-mpv-integration PRIVATE Threads::Threads)
-    add_test(NAME mpv-integration COMMAND pocket-music-mpv-integration)
-  endif()
+  add_executable(pocket-music-ffmpeg-integration
+    tests/test_ffmpeg_integration.cpp
+    src/core/ffmpeg_sdl_player.cpp
+  )
+  target_include_directories(pocket-music-ffmpeg-integration PRIVATE src)
+  target_compile_options(pocket-music-ffmpeg-integration PRIVATE -Wall -Wextra -Wpedantic)
+  target_link_libraries(pocket-music-ffmpeg-integration PRIVATE
+    FFmpeg::audio
+    SDL2::SDL2
+    Threads::Threads
+  )
+  add_test(NAME ffmpeg-integration COMMAND pocket-music-ffmpeg-integration)
 endif()

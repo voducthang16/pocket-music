@@ -41,23 +41,14 @@ bool PlaybackController::requestLoad(size_t trackIndex, double resumeSeconds, bo
     if (trackIndex >= library_.tracks().size()) return false;
     const uint64_t generation = player_->load(library_.tracks()[trackIndex].path);
     if (generation == 0) {
-        failedLoad_ = FailedLoad{.trackIndex = trackIndex,
-                                 .resumeSeconds = std::max(0.0, resumeSeconds),
-                                 .startPaused = startPaused,
-                                 .source = {},
-                                 .sourcePosition = 0,
-                                 .sourceTitle = {}};
+        failedLoad_ = FailedLoad{trackIndex, std::max(0.0, resumeSeconds), startPaused, {}, 0, {}};
         snapshot_.phase = PlaybackPhase::Error;
         snapshot_.errorMessage = player_->error();
         ++revision_;
         return false;
     }
-    pendingLoad_ = PendingLoad{.generation = generation,
-                               .trackIndex = trackIndex,
-                               .resumeSeconds = std::max(0.0, resumeSeconds),
-                               .startPaused = startPaused,
-                               .seekable = false,
-                               .origin = origin};
+    pendingLoad_ = PendingLoad{generation, trackIndex, std::max(0.0, resumeSeconds), startPaused,
+                               false, origin};
     failedLoad_.reset();
     if (origin != LoadOrigin::Automatic) automaticFailures_ = 0;
     snapshot_.phase = PlaybackPhase::Loading;
@@ -131,19 +122,11 @@ void PlaybackController::handle(const PlayerEvent& event) {
                 }
             }
             if (pendingLoad_)
-                failedLoad_ = FailedLoad{.trackIndex = pendingLoad_->trackIndex,
-                                         .resumeSeconds = pendingLoad_->resumeSeconds,
-                                         .startPaused = pendingLoad_->startPaused,
-                                         .source = {},
-                                         .sourcePosition = 0,
-                                         .sourceTitle = {}};
+                failedLoad_ = FailedLoad{pendingLoad_->trackIndex, pendingLoad_->resumeSeconds,
+                                         pendingLoad_->startPaused, {}, 0, {}};
             else if (snapshot_.trackIndex)
-                failedLoad_ = FailedLoad{.trackIndex = *snapshot_.trackIndex,
-                                         .resumeSeconds = snapshot_.positionSeconds,
-                                         .startPaused = true,
-                                         .source = {},
-                                         .sourcePosition = 0,
-                                         .sourceTitle = {}};
+                failedLoad_ = FailedLoad{*snapshot_.trackIndex, snapshot_.positionSeconds, true,
+                                         {}, 0, {}};
             pendingLoad_.reset();
             snapshot_.phase = PlaybackPhase::Error;
             snapshot_.errorMessage = event.message.empty() ? "Playback failed" : event.message;

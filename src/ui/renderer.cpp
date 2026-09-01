@@ -42,7 +42,8 @@ void drawTopBar(AppState& app, const std::string& title, const std::string& eyeb
 SDL_Texture* albumCover(AppState& app, const Track& track) {
     if (track.coverPath.empty()) return nullptr;
     const auto key = track.coverPath.string();
-    if (app.coverCache.contains(key)) return app.coverCache[key];
+    if (const auto cached = app.coverCache.find(key); cached != app.coverCache.end())
+        return cached->second;
     return app.coverCache[key] = IMG_LoadTexture(app.renderer, key.c_str());
 }
 

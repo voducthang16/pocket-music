@@ -25,6 +25,16 @@ void cachedGroups() {
     require(library.artists().size() == 1, "artists must be cached");
     require(library.allTrackIndexes().size() == 2, "full-library queue must be cached");
 }
+void ignoresAppleDoubleAudioFiles() {
+    TemporaryDirectory temporary;
+    const auto music = temporary.path / "Music";
+    touch(music / "Song.mp3");
+    touch(music / "._Song.mp3");
+    MusicLibrary library(music);
+    require(library.scan(), "library with AppleDouble metadata must scan");
+    require(library.tracks().size() == 1, "AppleDouble metadata must not become tracks");
+    require(library.tracks().front().title == "Song", "real audio file must remain visible");
+}
 void playlistBom() {
     TemporaryDirectory temporary;
     const auto music = temporary.path / "Music";
@@ -46,5 +56,6 @@ void playlistBom() {
 void addLibraryTests(TestCases& tests) {
     tests.emplace_back("missing library", missingLibrary);
     tests.emplace_back("cached groups", cachedGroups);
+    tests.emplace_back("ignore AppleDouble audio files", ignoresAppleDoubleAudioFiles);
     tests.emplace_back("playlist BOM", playlistBom);
 }

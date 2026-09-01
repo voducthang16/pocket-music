@@ -1,0 +1,8 @@
+{
+  "package": "com.pocketmusic.player",
+  "label": "Pocket Music",
+  "icontop": "icon.png",
+  "icon": "",
+  "launch": "launch.sh",
+  "description": "Offline music player"
+}

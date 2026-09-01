@@ -73,10 +73,10 @@ void handleControllerButton(AppState& app, Uint8 b) {
             handleKey(app, SDLK_RIGHT);
             break;
         case SDL_CONTROLLER_BUTTON_A:
-            handleKey(app, SDLK_RETURN);
+            handleKey(app, SDLK_ESCAPE);
             break;
         case SDL_CONTROLLER_BUTTON_B:
-            handleKey(app, SDLK_ESCAPE);
+            handleKey(app, SDLK_RETURN);
             break;
         case SDL_CONTROLLER_BUTTON_START:
             handleKey(app, SDLK_SPACE);

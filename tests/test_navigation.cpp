@@ -4,6 +4,7 @@
 #include "app/navigation.hpp"
 #include "fake_player.hpp"
 #include "test_suites.hpp"
+#include "ui/input.hpp"
 namespace fs = std::filesystem;
 namespace {
 void navigationQueue() {
@@ -70,9 +71,25 @@ void themeSettingsUseNavigationStack() {
     require(app.view.screen == Screen::Library && app.view.selected == 5,
             "Back must restore the selected Settings row in Library");
 }
+
+void trimuiFaceButtonMapping() {
+    TemporaryDirectory temporary;
+    const auto music = temporary.path / "Music";
+    touch(music / "Song.mp3");
+    AppState app(music, std::make_unique<FakePlayer>());
+    require(app.library.scan(), "controller fixture must scan");
+    buildLibraryView(app);
+
+    handleControllerButton(app, SDL_CONTROLLER_BUTTON_B);
+    require(app.view.screen == Screen::Tracks, "TrimUI A button must select the current item");
+
+    handleControllerButton(app, SDL_CONTROLLER_BUTTON_A);
+    require(app.view.screen == Screen::Library, "TrimUI B button must navigate back");
+}
 }  // namespace
 void addNavigationTests(TestCases& tests) {
     tests.emplace_back("navigation queue", navigationQueue);
     tests.emplace_back("failed load", failedLoad);
     tests.emplace_back("theme settings", themeSettingsUseNavigationStack);
+    tests.emplace_back("TrimUI face button mapping", trimuiFaceButtonMapping);
 }

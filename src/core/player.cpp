@@ -17,7 +17,7 @@ using Json = nlohmann::json;
 
 namespace {
 constexpr size_t kMaximumMessageSize = 1024 * 1024;
-constexpr const char* kGenerationPrefix = "pocket-music-request-";
+constexpr char kGenerationPrefix[] = "pocket-music-request-";
 
 std::string messageForMpvError(const Json& message) {
     if (message.contains("file_error") && message["file_error"].is_string())
@@ -30,7 +30,7 @@ std::string messageForMpvError(const Json& message) {
 uint64_t generationFromTitle(const Json& data) {
     if (!data.is_string()) return 0;
     const auto title = data.get<std::string>();
-    if (!title.starts_with(kGenerationPrefix)) return 0;
+    if (title.compare(0, sizeof(kGenerationPrefix) - 1, kGenerationPrefix) != 0) return 0;
     try {
         return std::stoull(title.substr(std::strlen(kGenerationPrefix)));
     } catch (...) {

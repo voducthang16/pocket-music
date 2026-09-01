@@ -123,7 +123,7 @@ bool PlaybackQueue::restore(std::vector<size_t> source, std::vector<size_t> orde
     for (size_t track : order) ++orderCounts[track];
     if (sourceCounts != orderCounts) return false;
     for (size_t track : history)
-        if (!sourceCounts.contains(track)) return false;
+        if (sourceCounts.find(track) == sourceCounts.end()) return false;
     std::map<size_t, std::vector<size_t>> availablePositions;
     for (size_t position = 0; position < source.size(); ++position)
         availablePositions[source[position]].push_back(position);

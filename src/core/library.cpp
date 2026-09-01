@@ -23,7 +23,11 @@ std::string lower(std::string value) {
 
 bool isAudio(const fs::path& path) {
     static const std::set<std::string> extensions = {".mp3", ".flac", ".wav", ".ogg"};
-    return extensions.contains(lower(path.extension().string()));
+    return extensions.find(lower(path.extension().string())) != extensions.end();
+}
+
+bool isAppleDouble(const fs::path& path) {
+    return path.filename().string().compare(0, 2, "._") == 0;
 }
 
 std::string utf8(const TagLib::String& value) { return value.to8Bit(true); }
@@ -93,7 +97,7 @@ bool MusicLibrary::scan() {
             playlistPaths.push_back(path);
             continue;
         }
-        if (!isAudio(path)) continue;
+        if (isAppleDouble(path) || !isAudio(path)) continue;
 
         Track track;
         track.path = path;
@@ -154,7 +158,7 @@ bool MusicLibrary::scan() {
         bool firstLine = true;
         while (std::getline(stream, line)) {
             if (!line.empty() && line.back() == '\r') line.pop_back();
-            if (firstLine && line.starts_with("\xEF\xBB\xBF")) line.erase(0, 3);
+            if (firstLine && line.compare(0, 3, "\xEF\xBB\xBF") == 0) line.erase(0, 3);
             firstLine = false;
             if (line.empty() || line.front() == '#' || line.find("://") != std::string::npos)
                 continue;

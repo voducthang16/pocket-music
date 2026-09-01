@@ -26,7 +26,7 @@ bool isConsistent(const PlaybackSession& session) {
         session.orderPaths[session.cursor] != session.currentTrackPath)
         return false;
     for (const auto& path : session.historyPaths)
-        if (!sourceCounts.contains(path)) return false;
+        if (sourceCounts.find(path) == sourceCounts.end()) return false;
     return true;
 }
 }  // namespace

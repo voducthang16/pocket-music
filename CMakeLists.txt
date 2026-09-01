@@ -1,14 +1,47 @@
 cmake_minimum_required(VERSION 3.20)
 project(pocket_music VERSION 0.1.0 LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 20)
+option(POCKET_MUSIC_TRIMUI "Build for TrimUI Stock OS" OFF)
+
+if(POCKET_MUSIC_TRIMUI)
+  set(CMAKE_CXX_STANDARD 17)
+else()
+  set(CMAKE_CXX_STANDARD 20)
+endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-find_package(SDL2 CONFIG REQUIRED)
-find_package(SDL2_ttf CONFIG REQUIRED)
-find_package(SDL2_image CONFIG REQUIRED)
+find_package(SDL2 CONFIG QUIET)
+if(NOT TARGET SDL2::SDL2)
+  find_package(PkgConfig REQUIRED)
+  pkg_check_modules(SDL2 REQUIRED IMPORTED_TARGET sdl2)
+  add_library(SDL2::SDL2 ALIAS PkgConfig::SDL2)
+endif()
+
+find_package(SDL2_ttf CONFIG QUIET)
+if(NOT TARGET SDL2_ttf::SDL2_ttf)
+  find_path(SDL2_TTF_INCLUDE_DIR SDL_ttf.h PATH_SUFFIXES SDL2 REQUIRED)
+  find_library(SDL2_TTF_LIBRARY NAMES SDL2_ttf REQUIRED)
+  add_library(SDL2_ttf::SDL2_ttf UNKNOWN IMPORTED)
+  set_target_properties(SDL2_ttf::SDL2_ttf PROPERTIES
+    IMPORTED_LOCATION "${SDL2_TTF_LIBRARY}"
+    INTERFACE_INCLUDE_DIRECTORIES "${SDL2_TTF_INCLUDE_DIR}"
+  )
+endif()
+
+find_package(SDL2_image CONFIG QUIET)
+if(NOT TARGET SDL2_image::SDL2_image)
+  find_path(SDL2_IMAGE_INCLUDE_DIR SDL_image.h PATH_SUFFIXES SDL2 REQUIRED)
+  find_library(SDL2_IMAGE_LIBRARY NAMES SDL2_image REQUIRED)
+  add_library(SDL2_image::SDL2_image UNKNOWN IMPORTED)
+  set_target_properties(SDL2_image::SDL2_image PROPERTIES
+    IMPORTED_LOCATION "${SDL2_IMAGE_LIBRARY}"
+    INTERFACE_INCLUDE_DIRECTORIES "${SDL2_IMAGE_INCLUDE_DIR}"
+  )
+endif()
+
 find_package(TagLib CONFIG REQUIRED)
+find_package(Threads REQUIRED)
 
 add_executable(pocket-music
   src/main.cpp
@@ -35,7 +68,12 @@ target_link_libraries(pocket-music PRIVATE
   SDL2_ttf::SDL2_ttf
   SDL2_image::SDL2_image
   TagLib::tag
+  Threads::Threads
 )
+
+if(POCKET_MUSIC_TRIMUI)
+  target_link_libraries(pocket-music PRIVATE stdc++fs)
+endif()
 
 if(APPLE)
   target_link_libraries(pocket-music PRIVATE "-framework CoreFoundation")
@@ -61,11 +99,17 @@ if(BUILD_TESTING)
     src/settings/preferences.cpp
     src/app/navigation.cpp
     src/ui/primitives.cpp
+    src/ui/input.cpp
     src/ui/theme.cpp
   )
   target_include_directories(pocket-music-tests PRIVATE src third_party)
   target_compile_options(pocket-music-tests PRIVATE -Wall -Wextra -Wpedantic)
-  target_link_libraries(pocket-music-tests PRIVATE TagLib::tag SDL2::SDL2 SDL2_ttf::SDL2_ttf)
+  target_link_libraries(pocket-music-tests PRIVATE
+    TagLib::tag
+    SDL2::SDL2
+    SDL2_ttf::SDL2_ttf
+    Threads::Threads
+  )
 
   add_test(NAME unit COMMAND pocket-music-tests)
   add_test(NAME smoke COMMAND pocket-music --smoke-test --music ${CMAKE_SOURCE_DIR}/Music)
@@ -78,6 +122,7 @@ if(BUILD_TESTING)
     )
     target_include_directories(pocket-music-mpv-integration PRIVATE src third_party)
     target_compile_options(pocket-music-mpv-integration PRIVATE -Wall -Wextra -Wpedantic)
+    target_link_libraries(pocket-music-mpv-integration PRIVATE Threads::Threads)
     add_test(NAME mpv-integration COMMAND pocket-music-mpv-integration)
   endif()
 endif()

@@ -37,5 +37,21 @@ endif()
 
 include(CTest)
 if(BUILD_TESTING)
-  add_test(NAME smoke COMMAND pocket-music --smoke-test)
+  add_executable(pocket-music-tests
+    tests/test_main.cpp
+    tests/test_library.cpp
+    tests/test_navigation.cpp
+    tests/test_player.cpp
+    tests/test_state.cpp
+    src/core/library.cpp
+    src/core/player.cpp
+    src/core/state.cpp
+    src/app/navigation.cpp
+  )
+  target_include_directories(pocket-music-tests PRIVATE src)
+  target_compile_options(pocket-music-tests PRIVATE -Wall -Wextra -Wpedantic)
+  target_link_libraries(pocket-music-tests PRIVATE TagLib::tag SDL2::SDL2 SDL2_ttf::SDL2_ttf)
+
+  add_test(NAME unit COMMAND pocket-music-tests)
+  add_test(NAME smoke COMMAND pocket-music --smoke-test --music ${CMAKE_SOURCE_DIR}/Music)
 endif()

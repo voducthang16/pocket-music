@@ -4,7 +4,7 @@ MUSIC_DIR ?= Music
 CMAKE ?= cmake
 JOBS ?= 4
 FORMATTER ?= /Library/Developer/CommandLineTools/usr/bin/clang-format
-SOURCES := $(shell find src -type f \( -name '*.cpp' -o -name '*.hpp' \))
+SOURCES := $(shell find src tests -type f \( -name '*.cpp' -o -name '*.hpp' \))
 
 .PHONY: help setup build run test format
 

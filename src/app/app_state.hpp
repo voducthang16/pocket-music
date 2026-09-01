@@ -1,9 +1,11 @@
 #pragma once
+
 #include <SDL.h>
 #include <SDL_ttf.h>
 
 #include <filesystem>
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -11,7 +13,22 @@
 #include "core/player.hpp"
 #include "core/state.hpp"
 
-enum class Screen { Menu, Songs, Albums, Artists, Playlists, Filtered, NowPlaying };
+enum class Screen { Library, Albums, Artists, Playlists, Tracks, NowPlaying };
+
+struct ViewItem {
+    std::string title;
+    std::string subtitle;
+    std::vector<size_t> trackIndexes;
+};
+
+struct ViewState {
+    Screen screen = Screen::Library;
+    std::string title = "Library";
+    std::string eyebrow;
+    std::vector<ViewItem> items;
+    int selected = 0;
+    int scroll = 0;
+};
 
 struct AppState {
     SDL_Window* window = nullptr;
@@ -20,15 +37,20 @@ struct AppState {
     TTF_Font* bodyFont = nullptr;
     TTF_Font* smallFont = nullptr;
     MusicLibrary library;
-    MpvPlayer player;
+    std::unique_ptr<AudioPlayer> player;
     SavedState saved;
-    Screen screen = Screen::Menu;
-    Screen previous = Screen::Menu;
-    int selected = 0, scroll = 0, currentTrack = -1;
-    bool running = true, shuffle = false, trackEnded = false;
+    ViewState view;
+    std::vector<ViewState> history;
+    std::vector<size_t> queue;
+    size_t queuePosition = 0;
+    int currentTrack = -1;
+    bool running = true;
+    bool shuffle = false;
     int repeatMode = 0;
-    std::vector<size_t> filtered;
-    std::string filteredTitle;
+    std::string message;
     std::map<std::string, SDL_Texture*> coverCache;
-    explicit AppState(std::filesystem::path path) : library(std::move(path)) {}
+    std::vector<SDL_GameController*> controllers;
+    explicit AppState(std::filesystem::path path,
+                      std::unique_ptr<AudioPlayer> audioPlayer = std::make_unique<MpvPlayer>())
+        : library(std::move(path)), player(std::move(audioPlayer)) {}
 };

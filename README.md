@@ -4,6 +4,9 @@ A lightweight, controller-first offline music player for Linux handhelds. The cu
 
 The agreed product scope and acceptance criteria are documented in [`docs/MVP.md`](docs/MVP.md).
 
+The UI bundles Noto Sans under the SIL Open Font License so text renders consistently across
+development and handheld targets.
+
 ## MVP features
 
 - Browse songs, albums, artists, and M3U/M3U8 playlists
@@ -11,7 +14,7 @@ The agreed product scope and acceptance criteria are documented in [`docs/MVP.md
 - Play MP3, FLAC, WAV, and OGG through mpv
 - Display `cover.jpg`, `cover.png`, `folder.jpg`, or `folder.png` beside an album
 - Play/pause, seek, previous/next, shuffle, and repeat state
-- Restore the current track, approximate position, and last screen
+- Restore the current track and exact mpv-reported position after the file is ready
 - Keyboard and SDL game-controller navigation
 
 Embedded cover art and the final Hammer launcher/button map belong to the hardware-validation checkpoint.
@@ -52,6 +55,7 @@ Put music under `Music/`, or point at another directory:
 
 ```sh
 ./build/pocket-music --music "/path/to/Music"
+./build/pocket-music --music "/path/to/Music" --fullscreen
 ```
 
 ## Controls
@@ -66,8 +70,6 @@ Put music under `Music/`, or point at another directory:
 | X | X | Now Playing |
 | Y | Y | Toggle shuffle |
 | R | To validate | Cycle repeat mode |
-
-On macOS, left-click a menu row to open/select it, click Now Playing to play/pause, and right-click to go back.
 
 ## Music card layout
 
@@ -87,6 +89,11 @@ cmake -S . -B build -DBUILD_TESTING=ON
 cmake --build build
 ctest --test-dir build --output-on-failure
 ```
+
+The test suite covers safe library discovery, cached groups, BOM-aware M3U playlists, atomic and
+validated Unicode state persistence, mpv command escaping, navigation history, scoped playback
+queues, and failed audio loads. Audio output and physical controls remain runtime checks because
+they depend on mpv, macOS CoreAudio, and the target handheld.
 
 ## Hammer checkpoint
 

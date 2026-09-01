@@ -12,69 +12,31 @@
 #include "ui/theme.hpp"
 
 namespace {
-std::string duration(int seconds) {
+constexpr int kPagePadding = 40;
+constexpr int kTopBarHeight = 102;
+constexpr int kLibraryRowHeight = 108;
+constexpr int kTrackRowHeight = 94;
+
+std::string formatDuration(int seconds) {
     std::ostringstream stream;
     stream << seconds / 60 << ':' << std::setw(2) << std::setfill('0') << seconds % 60;
     return stream.str();
 }
 
-void drawHeader(AppState& app) {
-    verticalGradient(app.renderer, {0, 0, layout::width, layout::headerHeight}, theme::headerTop,
-                     theme::headerBottom);
-    fillRect(app.renderer, {0, layout::headerHeight - 2, layout::width, 2}, {153, 158, 166, 255});
-    drawText(app.renderer, app.titleFont, screenHeading(app), layout::width / 2, 12, theme::text,
-             520, true);
-    if (app.currentTrack >= 0) {
-        drawPlayState(app.renderer, 27, 27, app.player.paused(), theme::textMuted);
-    }
-    drawBattery(app.renderer, layout::width - 66, 27, 100);
+std::string countLabel(size_t count, const char* singular, const char* plural) {
+    return std::to_string(count) + ' ' + (count == 1 ? singular : plural);
 }
 
-void drawEmptyState(AppState& app) {
-    fillRect(app.renderer, {layout::width / 2 - 68, 250, 136, 136}, {225, 228, 233, 255});
-    drawPlayState(app.renderer, layout::width / 2 - 18, 300, false, theme::textMuted);
-    drawText(app.renderer, app.bodyFont, "No music found", layout::width / 2, 430, theme::text, 600,
-             true);
-    drawText(app.renderer, app.smallFont, "Copy songs into the Music folder", layout::width / 2,
-             490, theme::textMuted, 650, true);
-}
-
-void drawList(AppState& app) {
-    const auto items = visibleLabels(app);
-    if (items.empty()) {
-        drawEmptyState(app);
-        return;
+void drawTopBar(AppState& app, const std::string& title, const std::string& eyebrow = {}) {
+    fillRect(app.renderer, {0, 0, layout::width, kTopBarHeight}, theme::background);
+    if (!eyebrow.empty()) {
+        drawText(app.renderer, app.smallFont, eyebrow, kPagePadding, 20, theme::textMuted,
+                 layout::width - kPagePadding * 2);
     }
-    const int visible = (layout::height - layout::headerHeight) / layout::rowHeight;
-    if (app.selected < app.scroll) app.scroll = app.selected;
-    if (app.selected >= app.scroll + visible) app.scroll = app.selected - visible + 1;
-    for (int row = 0; row < visible && app.scroll + row < static_cast<int>(items.size()); ++row) {
-        const int index = app.scroll + row;
-        const int y = layout::headerHeight + row * layout::rowHeight;
-        const bool active = index == app.selected;
-        if (active) {
-            verticalGradient(app.renderer, {0, y, layout::width, layout::rowHeight}, theme::blueTop,
-                             theme::blueBottom);
-        } else {
-            fillRect(app.renderer, {0, y, layout::width, layout::rowHeight}, theme::surface);
-        }
-        drawText(app.renderer, app.bodyFont, items[index], 30, y + 18,
-                 active ? theme::white : theme::text, layout::width - 105);
-        drawChevron(app.renderer, layout::width - 43, y + layout::rowHeight / 2,
-                    active ? theme::white : theme::textMuted);
-        fillRect(app.renderer, {0, y + layout::rowHeight - 1, layout::width, 1},
-                 active ? theme::blueBottom : theme::divider);
-    }
-
-    if (items.size() > static_cast<size_t>(visible)) {
-        const int trackHeight = layout::height - layout::headerHeight - 24;
-        const int thumbHeight =
-            std::max(48, trackHeight * visible / static_cast<int>(items.size()));
-        const int maxScroll = static_cast<int>(items.size()) - visible;
-        const int thumbY = layout::headerHeight + 12 +
-                           (trackHeight - thumbHeight) * app.scroll / std::max(1, maxScroll);
-        fillRect(app.renderer, {layout::width - 8, thumbY, 4, thumbHeight}, {140, 145, 155, 180});
-    }
+    drawText(app.renderer, app.titleFont, title, kPagePadding, eyebrow.empty() ? 25 : 47,
+             theme::text, layout::width - kPagePadding * 2);
+    fillRect(app.renderer, {kPagePadding, kTopBarHeight - 1, layout::width - kPagePadding * 2, 1},
+             theme::divider);
 }
 
 SDL_Texture* albumCover(AppState& app, const Track& track) {
@@ -84,65 +46,191 @@ SDL_Texture* albumCover(AppState& app, const Track& track) {
     return app.coverCache[key] = IMG_LoadTexture(app.renderer, key.c_str());
 }
 
-void drawPlaceholderCover(AppState& app, const SDL_Rect& art) {
-    verticalGradient(app.renderer, art, {231, 233, 238, 255}, {189, 194, 203, 255});
-    fillRect(app.renderer, {art.x + 118, art.y + 118, art.w - 236, art.h - 236}, {54, 60, 70, 255});
-    fillRect(app.renderer, {art.x + art.w / 2 - 28, art.y + art.h / 2 - 28, 56, 56},
-             theme::background);
-    drawText(app.renderer, app.smallFont, "CLASSIC IPOD", art.x + art.w / 2, art.y + art.h - 62,
-             theme::textMuted, art.w - 80, true);
+void drawCover(SDL_Renderer* renderer, SDL_Texture* texture, const SDL_Rect& bounds) {
+    int width = 0, height = 0;
+    if (SDL_QueryTexture(texture, nullptr, nullptr, &width, &height) != 0 || width <= 0 ||
+        height <= 0)
+        return;
+    SDL_Rect target = bounds;
+    if (width * bounds.h > height * bounds.w) {
+        target.h = bounds.w * height / width;
+        target.y += (bounds.h - target.h) / 2;
+    } else {
+        target.w = bounds.h * width / height;
+        target.x += (bounds.w - target.w) / 2;
+    }
+    SDL_RenderCopy(renderer, texture, nullptr, &target);
+}
+
+void drawCoverPlaceholder(AppState& app, const SDL_Rect& bounds) {
+    fillRect(app.renderer, bounds, theme::surfaceRaised);
+    const int centerX = bounds.x + bounds.w / 2;
+    const int centerY = bounds.y + bounds.h / 2;
+    fillRect(app.renderer,
+             {centerX - bounds.w / 5, centerY - bounds.h / 5, bounds.w * 2 / 5, bounds.h * 2 / 5},
+             theme::accentSoft);
+    drawPlayState(app.renderer, centerX - 9, centerY - 9, false, theme::accent);
+}
+
+void drawMiniPlayer(AppState& app) {
+    const SDL_Rect panel{kPagePadding, layout::height - 150, layout::width - kPagePadding * 2, 118};
+    fillRect(app.renderer, panel, theme::surfaceRaised);
+    if (app.currentTrack < 0) {
+        drawText(app.renderer, app.bodyFont, "Choose a song to start", panel.x + 28, panel.y + 24,
+                 theme::text, panel.w - 56);
+        drawText(app.renderer, app.smallFont, "Your music stays offline", panel.x + 28,
+                 panel.y + 69, theme::textMuted, panel.w - 56);
+        return;
+    }
+
+    const auto& track = app.library.tracks()[app.currentTrack];
+    const SDL_Rect art{panel.x + 10, panel.y + 10, 98, 98};
+    if (SDL_Texture* texture = albumCover(app, track))
+        drawCover(app.renderer, texture, art);
+    else
+        drawCoverPlaceholder(app, art);
+    drawText(app.renderer, app.bodyFont, track.title, panel.x + 130, panel.y + 20, theme::text,
+             panel.w - 210);
+    drawText(app.renderer, app.smallFont, track.artist, panel.x + 130, panel.y + 66,
+             theme::textMuted, panel.w - 210);
+    drawPlayState(app.renderer, panel.x + panel.w - 54, panel.y + 49, app.player->snapshot().paused,
+                  theme::text);
+}
+
+void drawLibrary(AppState& app) {
+    drawTopBar(app, "Library",
+               countLabel(app.library.tracks().size(), "song", "songs") + " available offline");
+    const auto& items = app.view.items;
+
+    for (int index = 0; index < static_cast<int>(items.size()); ++index) {
+        const int y = kTopBarHeight + 18 + index * kLibraryRowHeight;
+        const bool active = index == app.view.selected;
+        if (active) {
+            fillRect(app.renderer,
+                     {kPagePadding, y, layout::width - kPagePadding * 2, kLibraryRowHeight - 8},
+                     theme::surfaceRaised);
+            fillRect(app.renderer, {kPagePadding, y + 15, 5, kLibraryRowHeight - 38},
+                     theme::accent);
+        }
+        drawText(app.renderer, app.bodyFont, items[index].title, kPagePadding + 26, y + 14,
+                 theme::text, layout::width - 210);
+        drawText(app.renderer, app.smallFont, items[index].subtitle, kPagePadding + 26, y + 59,
+                 theme::textMuted, layout::width - 210);
+        drawChevron(app.renderer, layout::width - kPagePadding - 24, y + 47,
+                    active ? theme::accent : theme::textMuted);
+    }
+    drawMiniPlayer(app);
+}
+
+const Track* trackForListRow(const AppState& app, int index) {
+    if (app.view.screen == Screen::Tracks && index >= 0 &&
+        index < static_cast<int>(app.view.items.size()) &&
+        !app.view.items[index].trackIndexes.empty())
+        return &app.library.tracks()[app.view.items[index].trackIndexes.front()];
+    return nullptr;
+}
+
+void drawEmptyState(AppState& app) {
+    const SDL_Rect art{layout::width / 2 - 70, 280, 140, 140};
+    drawCoverPlaceholder(app, art);
+    drawText(app.renderer, app.bodyFont, "Nothing here yet", layout::width / 2, 458, theme::text,
+             560, true);
+    drawText(app.renderer, app.smallFont, "Add music to the Music folder", layout::width / 2, 510,
+             theme::textMuted, 620, true);
+}
+
+void drawList(AppState& app) {
+    const auto& items = app.view.items;
+    drawTopBar(app, app.view.title, app.view.eyebrow);
+    if (items.empty()) {
+        drawEmptyState(app);
+        return;
+    }
+    const int visible = (layout::height - kTopBarHeight - 20) / kTrackRowHeight;
+    if (app.view.selected < app.view.scroll) app.view.scroll = app.view.selected;
+    if (app.view.selected >= app.view.scroll + visible)
+        app.view.scroll = app.view.selected - visible + 1;
+
+    for (int row = 0; row < visible && app.view.scroll + row < static_cast<int>(items.size());
+         ++row) {
+        const int index = app.view.scroll + row;
+        const int y = kTopBarHeight + 10 + row * kTrackRowHeight;
+        const bool active = index == app.view.selected;
+        if (active) {
+            fillRect(app.renderer, {24, y, layout::width - 48, kTrackRowHeight - 4},
+                     theme::surfaceRaised);
+            fillRect(app.renderer, {24, y + 13, 5, kTrackRowHeight - 30}, theme::accent);
+        }
+        drawText(app.renderer, app.bodyFont, items[index].title, 52, y + 10, theme::text,
+                 layout::width - 135);
+        if (const Track* track = trackForListRow(app, index)) {
+            drawText(app.renderer, app.smallFont,
+                     track->artist + "  -  " + formatDuration(track->durationSeconds), 52, y + 54,
+                     theme::textMuted, layout::width - 135);
+        }
+        drawChevron(app.renderer, layout::width - 48, y + 43,
+                    active ? theme::accent : theme::textMuted);
+        fillRect(app.renderer, {52, y + kTrackRowHeight - 5, layout::width - 100, 1},
+                 theme::divider);
+    }
 }
 
 void drawNowPlaying(AppState& app) {
+    drawTopBar(app, "Now Playing", "POCKET MUSIC");
     if (app.currentTrack < 0 || app.currentTrack >= static_cast<int>(app.library.tracks().size())) {
         drawEmptyState(app);
         return;
     }
     const auto& track = app.library.tracks()[app.currentTrack];
-    const SDL_Rect shadow{layout::width / 2 - 224, 112, 448, 448};
-    fillRect(app.renderer, shadow, {181, 184, 190, 255});
-    const SDL_Rect art{shadow.x + 5, shadow.y + 5, shadow.w - 10, shadow.h - 10};
+    const SDL_Rect art{layout::width / 2 - 220, 132, 440, 440};
     if (SDL_Texture* texture = albumCover(app, track))
-        SDL_RenderCopy(app.renderer, texture, nullptr, &art);
+        drawCover(app.renderer, texture, art);
     else
-        drawPlaceholderCover(app, art);
+        drawCoverPlaceholder(app, art);
 
-    drawMarqueeText(app.renderer, app.titleFont, track.title, {52, 598, layout::width - 104, 56},
+    drawMarqueeText(app.renderer, app.titleFont, track.title, {48, 612, layout::width - 96, 54},
                     theme::text, SDL_GetTicks64());
-    drawText(app.renderer, app.bodyFont, track.artist, layout::width / 2, 666, theme::textMuted,
-             layout::width - 110, true);
-    drawText(app.renderer, app.smallFont, track.album, layout::width / 2, 719, theme::textMuted,
-             layout::width - 130, true);
+    drawText(app.renderer, app.bodyFont, track.artist, layout::width / 2, 674, theme::textMuted,
+             layout::width - 120, true);
+    drawText(app.renderer, app.smallFont, track.album, layout::width / 2, 724, theme::textMuted,
+             layout::width - 140, true);
 
-    const int elapsed = std::max(0, app.player.elapsedSeconds());
-    const int total = std::max(1, track.durationSeconds);
-    const int progressWidth = layout::width - 110;
+    const auto playback = app.player->snapshot();
+    const int elapsed = std::max(0, static_cast<int>(playback.positionSeconds));
+    const int duration = playback.durationSeconds > 0 ? static_cast<int>(playback.durationSeconds)
+                                                      : track.durationSeconds;
+    const int total = std::max(1, duration);
+    const int progressWidth = layout::width - 112;
     const int filled = std::min(progressWidth, progressWidth * elapsed / total);
-    fillRect(app.renderer, {55, 805, progressWidth, 9}, {197, 201, 208, 255});
-    verticalGradient(app.renderer, {55, 805, filled, 9}, theme::blueTop, theme::blueBottom);
-    fillRect(app.renderer, {55 + std::max(0, filled - 4), 799, 9, 21}, theme::white);
-    strokeRect(app.renderer, {55 + std::max(0, filled - 4), 799, 9, 21}, theme::textMuted);
-    drawText(app.renderer, app.smallFont, duration(elapsed), 55, 833, theme::textMuted);
-    drawText(app.renderer, app.smallFont, duration(track.durationSeconds), layout::width - 126, 833,
+    fillRect(app.renderer, {56, 806, progressWidth, 8}, theme::surfaceRaised);
+    fillRect(app.renderer, {56, 806, filled, 8}, theme::accent);
+    drawText(app.renderer, app.smallFont, formatDuration(elapsed), 56, 830, theme::textMuted);
+    drawText(app.renderer, app.smallFont, formatDuration(duration), layout::width - 124, 830,
              theme::textMuted);
 
-    const char* state = app.player.paused() ? "PAUSED" : "PLAYING";
-    drawText(app.renderer, app.smallFont, state, layout::width / 2, 886, theme::blue, 200, true);
-    std::string modes =
-        std::string(app.shuffle ? "SHUFFLE  " : "") + (app.repeatMode == 1   ? "REPEAT ONE"
-                                                       : app.repeatMode == 2 ? "REPEAT ALL"
-                                                                             : "");
-    drawText(app.renderer, app.smallFont, modes, layout::width / 2, 929, theme::textMuted, 500,
-             true);
+    const SDL_Rect control{layout::width / 2 - 48, 894, 96, 96};
+    fillRect(app.renderer, control, theme::surfaceRaised);
+    drawPlayState(app.renderer, control.x + 39, control.y + 39, playback.paused, theme::text);
+    if (app.shuffle) drawText(app.renderer, app.smallFont, "SHUFFLE", 56, 925, theme::accent, 160);
+    if (app.repeatMode > 0)
+        drawText(app.renderer, app.smallFont, app.repeatMode == 1 ? "REPEAT 1" : "REPEAT", 555, 925,
+                 theme::accent, 160);
 }
 }  // namespace
 
 void renderApp(AppState& app) {
     fillRect(app.renderer, {0, 0, layout::width, layout::height}, theme::background);
-    drawHeader(app);
-    if (app.screen == Screen::NowPlaying)
+    if (app.view.screen == Screen::Library)
+        drawLibrary(app);
+    else if (app.view.screen == Screen::NowPlaying)
         drawNowPlaying(app);
     else
         drawList(app);
+    if (!app.message.empty()) {
+        const SDL_Rect banner{40, layout::height - 88, layout::width - 80, 56};
+        fillRect(app.renderer, banner, theme::surfaceRaised);
+        drawText(app.renderer, app.smallFont, app.message, banner.x + 18, banner.y + 12,
+                 theme::accent, banner.w - 36);
+    }
     SDL_RenderPresent(app.renderer);
 }

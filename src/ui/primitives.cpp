@@ -1,42 +1,65 @@
 #include "ui/primitives.hpp"
 
 #include <algorithm>
+#include <map>
+#include <tuple>
 
 #include "ui/theme.hpp"
+
+namespace {
+struct CachedText {
+    SDL_Texture* texture = nullptr;
+    int width = 0;
+    int height = 0;
+};
+
+using TextKey = std::tuple<SDL_Renderer*, TTF_Font*, Uint32, std::string>;
+std::map<TextKey, CachedText> textCache;
+
+std::string fitText(TTF_Font* font, std::string value, int maxWidth) {
+    if (maxWidth <= 0) return value;
+    int width = 0;
+    if (TTF_SizeUTF8(font, value.c_str(), &width, nullptr) != 0 || width <= maxWidth) return value;
+    while (!value.empty()) {
+        size_t start = value.size() - 1;
+        while (start > 0 && (static_cast<unsigned char>(value[start]) & 0xC0) == 0x80) --start;
+        value.erase(start);
+        const std::string candidate = value + "...";
+        if (TTF_SizeUTF8(font, candidate.c_str(), &width, nullptr) == 0 && width <= maxWidth)
+            return candidate;
+    }
+    return "...";
+}
+}  // namespace
 
 void fillRect(SDL_Renderer* r, const SDL_Rect& rect, SDL_Color c) {
     SDL_SetRenderDrawColor(r, c.r, c.g, c.b, c.a);
     SDL_RenderFillRect(r, &rect);
 }
-void strokeRect(SDL_Renderer* r, const SDL_Rect& rect, SDL_Color c) {
-    SDL_SetRenderDrawColor(r, c.r, c.g, c.b, c.a);
-    SDL_RenderDrawRect(r, &rect);
-}
-void verticalGradient(SDL_Renderer* r, const SDL_Rect& rect, SDL_Color top, SDL_Color bottom) {
-    for (int row = 0; row < rect.h; ++row) {
-        float a = rect.h <= 1 ? 0.0f : static_cast<float>(row) / (rect.h - 1);
-        SDL_Color c{static_cast<Uint8>(top.r + (bottom.r - top.r) * a),
-                    static_cast<Uint8>(top.g + (bottom.g - top.g) * a),
-                    static_cast<Uint8>(top.b + (bottom.b - top.b) * a), 255};
-        SDL_SetRenderDrawColor(r, c.r, c.g, c.b, c.a);
-        SDL_RenderDrawLine(r, rect.x, rect.y + row, rect.x + rect.w - 1, rect.y + row);
-    }
+void clearTextCache() {
+    for (auto& [_, cached] : textCache)
+        if (cached.texture) SDL_DestroyTexture(cached.texture);
+    textCache.clear();
 }
 void drawText(SDL_Renderer* r, TTF_Font* f, const std::string& value, int x, int y, SDL_Color c,
               int maxWidth, bool centered) {
     if (value.empty()) return;
-    SDL_Surface* s = TTF_RenderUTF8_Blended(f, value.c_str(), c);
-    if (!s) return;
-    SDL_Texture* t = SDL_CreateTextureFromSurface(r, s);
-    SDL_Rect target{x, y, s->w, s->h};
-    if (maxWidth > 0 && target.w > maxWidth) {
-        target.h = std::max(1, target.h * maxWidth / target.w);
-        target.w = maxWidth;
+    const std::string fitted = fitText(f, value, maxWidth);
+    const Uint32 color = (static_cast<Uint32>(c.r) << 24) | (static_cast<Uint32>(c.g) << 16) |
+                         (static_cast<Uint32>(c.b) << 8) | c.a;
+    const TextKey key{r, f, color, fitted};
+    auto found = textCache.find(key);
+    if (found == textCache.end()) {
+        SDL_Surface* surface = TTF_RenderUTF8_Blended(f, fitted.c_str(), c);
+        if (!surface) return;
+        CachedText cached{SDL_CreateTextureFromSurface(r, surface), surface->w, surface->h};
+        SDL_FreeSurface(surface);
+        if (!cached.texture) return;
+        found = textCache.emplace(key, cached).first;
     }
+    SDL_Rect target{x, y, found->second.width, found->second.height};
     if (centered) target.x = x - target.w / 2;
-    SDL_RenderCopy(r, t, nullptr, &target);
-    SDL_DestroyTexture(t);
-    SDL_FreeSurface(s);
+    SDL_RenderCopy(r, found->second.texture, nullptr, &target);
 }
 void drawMarqueeText(SDL_Renderer* r, TTF_Font* f, const std::string& value, const SDL_Rect& bounds,
                      SDL_Color c, Uint64 clock) {
@@ -79,10 +102,4 @@ void drawPlayState(SDL_Renderer* r, int x, int y, bool paused, SDL_Color c) {
         return;
     }
     for (int i = 0; i < 8; ++i) SDL_RenderDrawLine(r, x + i, y + i, x + i, y + 18 - i);
-}
-void drawBattery(SDL_Renderer* r, int x, int y, int percent) {
-    strokeRect(r, {x, y, 39, 18}, theme::textMuted);
-    fillRect(r, {x + 40, y + 5, 3, 8}, theme::textMuted);
-    fillRect(r, {x + 2, y + 2, std::clamp(percent, 0, 100) * 35 / 100, 14},
-             percent > 20 ? theme::green : theme::blue);
 }

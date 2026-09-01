@@ -9,11 +9,20 @@
 #include "app/navigation.hpp"
 #include "ui/input.hpp"
 #include "ui/layout.hpp"
+#include "ui/primitives.hpp"
 #include "ui/renderer.hpp"
 
 namespace {
 std::filesystem::path fontPath() {
     if (const char* custom = std::getenv("POCKET_MUSIC_FONT")) return custom;
+    const std::filesystem::path relative = "assets/fonts/NotoSans-Regular.ttf";
+    if (std::filesystem::exists(relative)) return relative;
+    if (char* rawBase = SDL_GetBasePath()) {
+        const std::filesystem::path base(rawBase);
+        SDL_free(rawBase);
+        for (const auto& candidate : {base / relative, base.parent_path() / relative})
+            if (std::filesystem::exists(candidate)) return candidate;
+    }
 #ifdef __APPLE__
     return "/System/Library/Fonts/Supplemental/Arial.ttf";
 #else
@@ -21,15 +30,19 @@ std::filesystem::path fontPath() {
 #endif
 }
 
-bool initializeUi(AppState& app) {
+bool initializeUi(AppState& app, bool fullscreen) {
+    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "1");
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER) != 0 ||
         TTF_Init() != 0 ||
-        (IMG_Init(IMG_INIT_JPG | IMG_INIT_PNG) & (IMG_INIT_JPG | IMG_INIT_PNG)) == 0) {
+        (IMG_Init(IMG_INIT_JPG | IMG_INIT_PNG) & (IMG_INIT_JPG | IMG_INIT_PNG)) !=
+            (IMG_INIT_JPG | IMG_INIT_PNG)) {
         std::cerr << "SDL initialization failed: " << SDL_GetError() << '\n';
         return false;
     }
+    const Uint32 windowFlags = SDL_WINDOW_ALLOW_HIGHDPI |
+                               (fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : SDL_WINDOW_RESIZABLE);
     app.window = SDL_CreateWindow("Pocket Music", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                                  480, 640, SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
+                                  384, 512, windowFlags);
     app.renderer =
         SDL_CreateRenderer(app.window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     if (app.renderer) SDL_RenderSetLogicalSize(app.renderer, layout::width, layout::height);
@@ -41,6 +54,13 @@ bool initializeUi(AppState& app) {
         std::cerr << "Could not create UI: " << SDL_GetError() << ' ' << TTF_GetError() << '\n';
         return false;
     }
+    TTF_SetFontHinting(app.titleFont, TTF_HINTING_LIGHT);
+    TTF_SetFontHinting(app.bodyFont, TTF_HINTING_LIGHT);
+    TTF_SetFontHinting(app.smallFont, TTF_HINTING_LIGHT);
+    for (int index = 0; index < SDL_NumJoysticks(); ++index)
+        if (SDL_IsGameController(index))
+            if (auto* controller = SDL_GameControllerOpen(index))
+                app.controllers.push_back(controller);
     return true;
 }
 
@@ -50,8 +70,9 @@ void restore(AppState& app, const std::filesystem::path& path) {
     app.repeatMode = app.saved.repeatMode;
     for (size_t i = 0; i < app.library.tracks().size(); ++i)
         if (app.library.tracks()[i].path.string() == app.saved.trackPath) {
-            playTrack(app, i, app.saved.positionSeconds);
-            if (app.saved.screen != "now-playing") app.screen = Screen::Menu;
+            if (playTrack(app, i, app.library.allTrackIndexes(), app.saved.positionSeconds) &&
+                app.saved.screen != "now-playing")
+                buildLibraryView(app);
             break;
         }
 }
@@ -59,17 +80,19 @@ void restore(AppState& app, const std::filesystem::path& path) {
 void persist(AppState& app, const std::filesystem::path& path) {
     if (app.currentTrack >= 0) {
         app.saved.trackPath = app.library.tracks()[app.currentTrack].path.string();
-        app.saved.positionSeconds = app.player.elapsedSeconds();
+        app.saved.positionSeconds = static_cast<int>(app.player->snapshot().positionSeconds);
     }
     app.saved.shuffle = app.shuffle;
     app.saved.repeatMode = app.repeatMode;
-    app.saved.screen = app.screen == Screen::NowPlaying ? "now-playing" : "menu";
-    saveState(path, app.saved);
+    app.saved.screen = app.view.screen == Screen::NowPlaying ? "now-playing" : "library";
+    if (!saveState(path, app.saved)) std::cerr << "Could not save playback state\n";
 }
 
 void destroyUi(AppState& app) {
+    for (auto* controller : app.controllers) SDL_GameControllerClose(controller);
     for (auto& [_, texture] : app.coverCache)
         if (texture) SDL_DestroyTexture(texture);
+    clearTextCache();
     if (app.smallFont) TTF_CloseFont(app.smallFont);
     if (app.bodyFont) TTF_CloseFont(app.bodyFont);
     if (app.titleFont) TTF_CloseFont(app.titleFont);
@@ -81,25 +104,47 @@ void destroyUi(AppState& app) {
 }
 }  // namespace
 
-int runApplication(const std::filesystem::path& musicPath, const std::filesystem::path& statePath) {
+int runApplication(const std::filesystem::path& musicPath, const std::filesystem::path& statePath,
+                   bool fullscreen) {
     AppState app(musicPath);
-    app.library.scan();
-    if (!initializeUi(app)) {
+    if (!app.library.scan()) {
+        std::cerr << "Music scan failed: " << app.library.error() << '\n';
+        app.message = app.library.error();
+    }
+    buildLibraryView(app);
+    if (!initializeUi(app, fullscreen)) {
         destroyUi(app);
         return 1;
     }
     restore(app, statePath);
+    int heldButton = -1;
+    Uint64 nextControllerRepeat = 0;
     while (app.running) {
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT)
                 app.running = false;
-            else if (event.type == SDL_KEYDOWN && !event.key.repeat)
+            else if (event.type == SDL_KEYDOWN &&
+                     (!event.key.repeat || event.key.keysym.sym == SDLK_UP ||
+                      event.key.keysym.sym == SDLK_DOWN || event.key.keysym.sym == SDLK_LEFT ||
+                      event.key.keysym.sym == SDLK_RIGHT))
                 handleKey(app, event.key.keysym.sym);
-            else if (event.type == SDL_MOUSEBUTTONDOWN)
-                handleMouse(app, event.button);
-            else if (event.type == SDL_CONTROLLERBUTTONDOWN)
+            else if (event.type == SDL_CONTROLLERBUTTONDOWN) {
                 handleControllerButton(app, event.cbutton.button);
+                if (event.cbutton.button == SDL_CONTROLLER_BUTTON_DPAD_UP ||
+                    event.cbutton.button == SDL_CONTROLLER_BUTTON_DPAD_DOWN ||
+                    event.cbutton.button == SDL_CONTROLLER_BUTTON_DPAD_LEFT ||
+                    event.cbutton.button == SDL_CONTROLLER_BUTTON_DPAD_RIGHT) {
+                    heldButton = event.cbutton.button;
+                    nextControllerRepeat = SDL_GetTicks64() + 350;
+                }
+            } else if (event.type == SDL_CONTROLLERBUTTONUP && event.cbutton.button == heldButton) {
+                heldButton = -1;
+            }
+        }
+        if (heldButton >= 0 && SDL_GetTicks64() >= nextControllerRepeat) {
+            handleControllerButton(app, static_cast<Uint8>(heldButton));
+            nextControllerRepeat = SDL_GetTicks64() + 90;
         }
         advanceWhenFinished(app);
         renderApp(app);

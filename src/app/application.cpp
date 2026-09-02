@@ -14,9 +14,7 @@
 #include "ui/renderer.hpp"
 
 namespace {
-std::filesystem::path fontPath() {
-    if (const char* custom = std::getenv("POCKET_MUSIC_FONT")) return custom;
-    const std::filesystem::path relative = "assets/fonts/NotoSans-Regular.ttf";
+std::filesystem::path resourcePath(const std::filesystem::path& relative) {
     if (std::filesystem::exists(relative)) return relative;
     if (char* rawBase = SDL_GetBasePath()) {
         const std::filesystem::path base(rawBase);
@@ -24,11 +22,23 @@ std::filesystem::path fontPath() {
         for (const auto& candidate : {base / relative, base.parent_path() / relative})
             if (std::filesystem::exists(candidate)) return candidate;
     }
+    return {};
+}
+
+std::filesystem::path fontPath() {
+    if (const char* custom = std::getenv("POCKET_MUSIC_FONT")) return custom;
+    if (const auto bundled = resourcePath("assets/fonts/NotoSans-Regular.ttf"); !bundled.empty())
+        return bundled;
 #ifdef __APPLE__
     return "/System/Library/Fonts/Supplemental/Arial.ttf";
 #else
     return "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
 #endif
+}
+
+SDL_Texture* loadResourceTexture(SDL_Renderer* renderer, const std::filesystem::path& relative) {
+    const auto path = resourcePath(relative);
+    return path.empty() ? nullptr : IMG_LoadTexture(renderer, path.c_str());
 }
 
 bool initializeUi(AppState& app, bool fullscreen) {
@@ -46,7 +56,14 @@ bool initializeUi(AppState& app, bool fullscreen) {
                                   1024, 768, windowFlags);
     app.renderer =
         SDL_CreateRenderer(app.window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-    if (app.renderer) SDL_RenderSetLogicalSize(app.renderer, layout::width, layout::height);
+    if (app.renderer) {
+        SDL_RenderSetLogicalSize(app.renderer, layout::width, layout::height);
+        SDL_SetRenderDrawBlendMode(app.renderer, SDL_BLENDMODE_BLEND);
+        app.backgroundTexture =
+            loadResourceTexture(app.renderer, "assets/background-hello-kitty-v6.png");
+        app.fallbackVinylTexture =
+            loadResourceTexture(app.renderer, "assets/fallback-vinyl.png");
+    }
     const auto font = fontPath();
     app.titleFont = TTF_OpenFont(font.c_str(), 36);
     app.bodyFont = TTF_OpenFont(font.c_str(), 30);
@@ -66,21 +83,20 @@ bool initializeUi(AppState& app, bool fullscreen) {
 }
 
 void restore(AppState& app, const std::filesystem::path& path) {
-    app.session = loadSession(path);
-    app.playback.setRepeatMode(static_cast<RepeatMode>(app.session.repeatMode));
-    auto resolved = resolvePlaybackSession(app.session, app.library);
+    const auto session = loadSession(path);
+    app.playback.setRepeatMode(static_cast<RepeatMode>(session.repeatMode));
+    auto resolved = resolvePlaybackSession(session, app.library);
     if (!resolved) return;
     if (app.playback.restore(std::move(resolved->source), std::move(resolved->order),
-                             std::move(resolved->history), resolved->cursor, app.session.shuffle,
-                             app.session.positionSeconds, app.session.sourceTitle) &&
-        app.session.screen == "now-playing")
-        app.view = {Screen::NowPlaying, "Now Playing", "", {}, 0, 0};
+                             std::move(resolved->history), resolved->cursor, session.shuffle,
+                             session.positionSeconds, session.sourceTitle) &&
+        session.screen == "now-playing")
+        app.view = nowPlayingView();
 }
 
 void persist(AppState& app, const std::filesystem::path& path) {
-    auto session =
+    const auto session =
         capturePlaybackSession(app.playback, app.library, app.view.screen == Screen::NowPlaying);
-    app.session = session;
     if (!saveSession(path, session)) std::cerr << "Could not save playback state\n";
 }
 
@@ -89,6 +105,8 @@ void destroyUi(AppState& app) {
     for (auto& [_, texture] : app.coverCache)
         if (texture) SDL_DestroyTexture(texture);
     clearTextCache();
+    if (app.fallbackVinylTexture) SDL_DestroyTexture(app.fallbackVinylTexture);
+    if (app.backgroundTexture) SDL_DestroyTexture(app.backgroundTexture);
     if (app.smallFont) TTF_CloseFont(app.smallFont);
     if (app.bodyFont) TTF_CloseFont(app.bodyFont);
     if (app.titleFont) TTF_CloseFont(app.titleFont);
@@ -101,10 +119,8 @@ void destroyUi(AppState& app) {
 }  // namespace
 
 int runApplication(const std::filesystem::path& musicPath, const std::filesystem::path& statePath,
-                   const std::filesystem::path& preferencesPath, bool fullscreen) {
+                   bool fullscreen) {
     AppState app(musicPath);
-    app.preferences = loadPreferences(preferencesPath);
-    app.theme = resolveTheme(app.preferences.theme);
     if (!app.library.scan()) {
         std::cerr << "Music scan failed: " << app.library.error() << '\n';
         app.message = app.library.error();
@@ -159,8 +175,6 @@ int runApplication(const std::filesystem::path& musicPath, const std::filesystem
         SDL_Delay(16);
     }
     persist(app, statePath);
-    if (!savePreferences(preferencesPath, app.preferences))
-        std::cerr << "Could not save app preferences\n";
     destroyUi(app);
     return 0;
 }

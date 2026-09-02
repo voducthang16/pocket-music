@@ -16,7 +16,6 @@ export POCKET_MUSIC_FONT="$APP_DIR/assets/fonts/NotoSans-Regular.ttf"
 "$APP_DIR/bin/pocket-music" \
   --music "$SD_ROOT/Music" \
   --state "$DATA_DIR/playback-state" \
-  --preferences "$DATA_DIR/preferences" \
   --fullscreen >"$LOG_FILE" 2>&1
 
 sync

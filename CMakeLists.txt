@@ -70,7 +70,6 @@ add_executable(pocket-music
   src/core/playback_queue.cpp
   src/core/playback_session.cpp
   src/core/state.cpp
-  src/settings/preferences.cpp
   src/ui/input.cpp
   src/ui/primitives.cpp
   src/ui/renderer.cpp
@@ -79,6 +78,7 @@ add_executable(pocket-music
   src/ui/renderer_now_playing.cpp
   src/ui/renderer_shared.cpp
   src/ui/theme.cpp
+  src/ui/vinyl.cpp
 )
 
 target_include_directories(pocket-music PRIVATE src)
@@ -107,8 +107,8 @@ if(BUILD_TESTING)
     tests/test_main.cpp
     tests/test_library.cpp
     tests/test_layout.cpp
+    tests/test_vinyl.cpp
     tests/test_navigation.cpp
-    tests/test_preferences.cpp
     tests/test_playback.cpp
     tests/test_state.cpp
     src/core/atomic_file.cpp
@@ -117,11 +117,11 @@ if(BUILD_TESTING)
     src/core/playback_queue.cpp
     src/core/playback_session.cpp
     src/core/state.cpp
-    src/settings/preferences.cpp
     src/app/navigation.cpp
     src/ui/primitives.cpp
     src/ui/input.cpp
     src/ui/theme.cpp
+    src/ui/vinyl.cpp
   )
   target_include_directories(pocket-music-tests PRIVATE src)
   target_compile_options(pocket-music-tests PRIVATE -Wall -Wextra -Wpedantic)

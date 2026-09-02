@@ -50,28 +50,6 @@ void failedLoad() {
     require(!app.message.empty(), "load failure must be visible to the UI state");
 }
 
-void themeSettingsUseNavigationStack() {
-    TemporaryDirectory temporary;
-    const auto music = temporary.path / "Music";
-    touch(music / "Song.mp3");
-    AppState app(music, std::make_unique<FakePlayer>());
-    require(app.library.scan(), "settings fixture must scan");
-    buildLibraryView(app);
-    app.view.selected = 5;
-    selectCurrentItem(app);
-    require(app.view.screen == Screen::Settings && app.history.size() == 1,
-            "Settings must open through the navigation stack");
-    require(app.view.items.front().subtitle == "Dark", "Settings must show the active theme");
-    selectCurrentItem(app);
-    require(app.preferences.theme == ThemeMode::Light,
-            "selecting Theme must update preferences immediately");
-    require(app.view.items.front().subtitle == "Light",
-            "theme value must update without reopening Settings");
-    navigateBack(app);
-    require(app.view.screen == Screen::Library && app.view.selected == 5,
-            "Back must restore the selected Settings row in Library");
-}
-
 void trimuiFaceButtonMapping() {
     TemporaryDirectory temporary;
     const auto music = temporary.path / "Music";
@@ -100,11 +78,69 @@ void trimuiSelectCyclesRepeatMode() {
     require(app.playback.repeatMode() == RepeatMode::Off,
             "TrimUI Select must cycle repeat back to off");
 }
+
+void restoredNowPlayingBackReturnsToLibrary() {
+    TemporaryDirectory temporary;
+    AppState app(temporary.path / "Music", std::make_unique<FakePlayer>());
+    app.view = nowPlayingView();
+
+    navigateBack(app);
+
+    require(app.running, "Back from restored Now Playing must keep the app running");
+    require(app.view.screen == Screen::Library,
+            "Back from restored Now Playing must return to Library");
+    require(app.history.empty(), "restored fallback must not create synthetic history");
+
+    navigateBack(app);
+    require(!app.running, "Back from root Library must still exit the app");
+}
+
+void libraryNowPlayingStatusRefreshesAfterPlaybackStarts() {
+    TemporaryDirectory temporary;
+    const auto music = temporary.path / "Music";
+    touch(music / "Song.mp3");
+    AppState app(music, std::make_unique<FakePlayer>());
+    require(app.library.scan(), "navigation fixture must scan");
+    buildLibraryView(app);
+    require(app.view.items[4].subtitle == "Nothing playing",
+            "Library must begin without a current track");
+
+    selectCurrentItem(app);
+    selectCurrentItem(app);
+    navigateBack(app);
+    navigateBack(app);
+
+    require(app.view.screen == Screen::Library,
+            "Back from a playing track must eventually restore Library");
+    require(app.view.items[4].subtitle == "Open current track",
+            "Library must refresh the Now Playing status after playback starts");
+}
+
+void openingNowPlayingUsesOneNavigationPath() {
+    TemporaryDirectory temporary;
+    const auto music = temporary.path / "Music";
+    touch(music / "Song.mp3");
+    AppState app(music, std::make_unique<FakePlayer>());
+    require(app.library.scan(), "navigation fixture must scan");
+    buildLibraryView(app);
+    require(app.playback.play(0, app.library.allTrackIndexes()), "track load must begin");
+
+    openNowPlaying(app);
+    require(app.view.screen == Screen::NowPlaying && app.history.size() == 1,
+            "opening Now Playing must preserve the source view once");
+    openNowPlaying(app);
+    require(app.history.size() == 1, "opening Now Playing twice must not duplicate history");
+}
 }  // namespace
 void addNavigationTests(TestCases& tests) {
     tests.emplace_back("navigation queue", navigationQueue);
     tests.emplace_back("failed load", failedLoad);
-    tests.emplace_back("theme settings", themeSettingsUseNavigationStack);
     tests.emplace_back("TrimUI face button mapping", trimuiFaceButtonMapping);
     tests.emplace_back("TrimUI Select repeat mapping", trimuiSelectCyclesRepeatMode);
+    tests.emplace_back("restored Now Playing back returns to Library",
+                       restoredNowPlayingBackReturnsToLibrary);
+    tests.emplace_back("Library Now Playing status refreshes",
+                       libraryNowPlayingStatusRefreshesAfterPlaybackStarts);
+    tests.emplace_back("Now Playing uses one navigation path",
+                       openingNowPlayingUsesOneNavigationPath);
 }

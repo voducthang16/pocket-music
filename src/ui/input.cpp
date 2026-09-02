@@ -42,10 +42,7 @@ void handleKey(AppState& app, SDL_Keycode code) {
             playAdjacentTrack(app, 1);
             break;
         case SDLK_x:
-            if (app.playback.snapshot().trackIndex && app.view.screen != Screen::NowPlaying) {
-                app.history.push_back(std::move(app.view));
-                app.view = {Screen::NowPlaying, "Now Playing", "", {}, 0, 0};
-            }
+            openNowPlaying(app);
             break;
         case SDLK_y:
             app.playback.setShuffle(!app.playback.shuffle());

@@ -1,10 +1,6 @@
 #include "app/navigation.hpp"
 
 #include <algorithm>
-#include <random>
-
-#include "ui/primitives.hpp"
-#include "ui/theme.hpp"
 
 namespace {
 std::string countLabel(size_t count, const char* singular, const char* plural) {
@@ -16,7 +12,7 @@ ViewItem trackItem(const Track& track, size_t index) {
 }
 
 ViewState tracksView(const AppState& app, std::string title, std::vector<size_t> indexes) {
-    ViewState view{Screen::Tracks, std::move(title), "LIBRARY", {}, 0, 0};
+    ViewState view{Screen::Tracks, std::move(title), {}, 0, 0};
     for (size_t index : indexes)
         view.items.push_back(trackItem(app.library.tracks()[index], index));
     return view;
@@ -27,9 +23,37 @@ void pushView(AppState& app, ViewState next) {
     app.view = std::move(next);
 }
 
+ViewState libraryView(const AppState& app) {
+    ViewState view{Screen::Library,
+                   "Library",
+                   {},
+                   0,
+                   0};
+    view.items = {
+        {"Songs", countLabel(app.library.tracks().size(), "track", "tracks"),
+         ViewAction::OpenSongs, app.library.allTrackIndexes()},
+        {"Albums", countLabel(app.library.albums().size(), "album", "albums"),
+         ViewAction::OpenAlbums, {}},
+        {"Artists", countLabel(app.library.artists().size(), "artist", "artists"),
+         ViewAction::OpenArtists, {}},
+        {"Playlists", countLabel(app.library.playlists().size(), "playlist", "playlists"),
+         ViewAction::OpenPlaylists, {}},
+        {"Now Playing",
+         app.playback.displayTrackIndex() ? "Open current track" : "Nothing playing",
+         ViewAction::OpenNowPlaying,
+         {}}};
+    return view;
+}
+
+void refreshLibraryView(AppState& app) {
+    const int selected = app.view.selected;
+    app.view = libraryView(app);
+    app.view.selected = std::clamp(selected, 0, static_cast<int>(app.view.items.size()) - 1);
+}
+
 void showGroups(AppState& app, Screen screen, const std::string& title,
                 const std::vector<TrackGroup>& groups) {
-    ViewState view{screen, title, "LIBRARY", {}, 0, 0};
+    ViewState view{screen, title, {}, 0, 0};
     for (const auto& group : groups)
         view.items.push_back({group.title, group.subtitle, ViewAction::None, group.trackIndexes});
     pushView(app, std::move(view));
@@ -37,33 +61,15 @@ void showGroups(AppState& app, Screen screen, const std::string& title,
 }  // namespace
 
 void buildLibraryView(AppState& app) {
-    app.view = {Screen::Library,
-                "Library",
-                countLabel(app.library.tracks().size(), "song", "songs") + " available offline",
-                {},
-                0,
-                0};
-    app.view.items = {
-        {"Songs", countLabel(app.library.tracks().size(), "track", "tracks"), ViewAction::OpenSongs,
-         app.library.allTrackIndexes()},
-        {"Albums",
-         countLabel(app.library.albums().size(), "album", "albums"),
-         ViewAction::OpenAlbums,
-         {}},
-        {"Artists",
-         countLabel(app.library.artists().size(), "artist", "artists"),
-         ViewAction::OpenArtists,
-         {}},
-        {"Playlists",
-         countLabel(app.library.playlists().size(), "playlist", "playlists"),
-         ViewAction::OpenPlaylists,
-         {}},
-        {"Now Playing",
-         app.playback.snapshot().trackIndex ? "Open current track" : "Nothing playing",
-         ViewAction::OpenNowPlaying,
-         {}},
-        {"Settings", "Appearance", ViewAction::OpenSettings, {}}};
+    app.view = libraryView(app);
     app.history.clear();
+}
+
+ViewState nowPlayingView() { return {Screen::NowPlaying, "Now Playing", {}, 0, 0}; }
+
+void openNowPlaying(AppState& app) {
+    if (app.view.screen == Screen::NowPlaying || !app.playback.displayTrackIndex()) return;
+    pushView(app, nowPlayingView());
 }
 
 bool playTrack(AppState& app, size_t trackIndex, const std::vector<size_t>& queue,
@@ -73,8 +79,7 @@ bool playTrack(AppState& app, size_t trackIndex, const std::vector<size_t>& queu
         return false;
     }
     app.message.clear();
-    if (app.view.screen != Screen::NowPlaying)
-        pushView(app, {Screen::NowPlaying, "Now Playing", "", {}, 0, 0});
+    openNowPlaying(app);
     return true;
 }
 
@@ -102,7 +107,7 @@ void selectCurrentItem(AppState& app) {
             showGroups(app, Screen::Artists, "Artists", app.library.artists());
             return;
         case ViewAction::OpenPlaylists: {
-            ViewState view{Screen::Playlists, "Playlists", "LIBRARY", {}, 0, 0};
+            ViewState view{Screen::Playlists, "Playlists", {}, 0, 0};
             for (const auto& playlist : app.library.playlists())
                 view.items.push_back({playlist.name,
                                       countLabel(playlist.trackIndexes.size(), "track", "tracks"),
@@ -111,23 +116,7 @@ void selectCurrentItem(AppState& app) {
             return;
         }
         case ViewAction::OpenNowPlaying:
-            if (app.playback.snapshot().trackIndex)
-                pushView(app, {Screen::NowPlaying, "Now Playing", "", {}, 0, 0});
-            return;
-        case ViewAction::OpenSettings: {
-            const auto selectedTheme = app.preferences.theme == ThemeMode::Dark ? "Dark" : "Light";
-            ViewState settings{Screen::Settings, "Settings", "APPEARANCE", {}, 0, 0};
-            settings.items.push_back({"Theme", selectedTheme, ViewAction::ToggleTheme, {}});
-            pushView(app, std::move(settings));
-            return;
-        }
-        case ViewAction::ToggleTheme:
-            app.preferences.theme =
-                app.preferences.theme == ThemeMode::Dark ? ThemeMode::Light : ThemeMode::Dark;
-            app.theme = resolveTheme(app.preferences.theme);
-            app.view.items[selected].subtitle =
-                app.preferences.theme == ThemeMode::Dark ? "Dark" : "Light";
-            clearTextCache();
+            openNowPlaying(app);
             return;
         case ViewAction::None:
             break;
@@ -145,19 +134,24 @@ void selectCurrentItem(AppState& app) {
 
 void navigateBack(AppState& app) {
     if (app.history.empty()) {
+        if (app.view.screen != Screen::Library) {
+            buildLibraryView(app);
+            return;
+        }
         app.running = false;
         return;
     }
     app.view = std::move(app.history.back());
     app.history.pop_back();
+    if (app.view.screen == Screen::Library) refreshLibraryView(app);
 }
 
 void advanceWhenFinished(AppState& app) {
     app.playback.update();
-    if (app.playback.snapshot().phase == PlaybackPhase::Error)
-        app.message = app.playback.snapshot().errorMessage;
-    else if (app.playback.snapshot().phase == PlaybackPhase::Loading ||
-             app.playback.snapshot().phase == PlaybackPhase::Playing ||
-             app.playback.snapshot().phase == PlaybackPhase::Paused)
+    const auto& playback = app.playback.snapshot();
+    if (playback.phase == PlaybackPhase::Error)
+        app.message = playback.errorMessage;
+    else if (playback.phase == PlaybackPhase::Loading ||
+             playback.phase == PlaybackPhase::Playing || playback.phase == PlaybackPhase::Paused)
         app.message.clear();
 }

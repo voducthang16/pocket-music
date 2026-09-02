@@ -6,9 +6,9 @@ int main() {
     TestCases tests;
     addLibraryTests(tests);
     addLayoutTests(tests);
+    addVinylTests(tests);
     addStateTests(tests);
     addPlaybackTests(tests);
-    addPreferencesTests(tests);
     addNavigationTests(tests);
     int failures = 0;
     for (const auto& [name, test] : tests) {

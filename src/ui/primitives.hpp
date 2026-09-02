@@ -4,6 +4,7 @@
 
 #include <string>
 void fillRect(SDL_Renderer*, const SDL_Rect&, SDL_Color);
+void fillRoundedRect(SDL_Renderer*, const SDL_Rect&, int radius, SDL_Color);
 void clearTextCache();
 void drawText(SDL_Renderer*, TTF_Font*, const std::string&, int, int, SDL_Color, int = 0,
               bool = false);

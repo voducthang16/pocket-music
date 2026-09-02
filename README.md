@@ -18,8 +18,11 @@ an external media-player process.
 - Preserve playback history and apply the three-second Previous behavior
 - Restore queue, shuffle order, history, repeat mode, and position in a paused state
 - Handle loading, finished, empty-library, and recoverable playback-error states
+- Return from a restored Now Playing session to Library before exiting the app
 - Navigate with a keyboard or SDL game controller
-- Persist Dark or Light appearance preferences
+- Use a pastel vintage stationery art direction: warm ivory paper, blush watercolor, pressed
+  flowers, soft cocoa details, and a small Hello Kitty cassette vignette kept outside the UI-safe
+  area
 
 Embedded cover art is not currently extracted; use one of the supported image filenames beside the
 audio files.
@@ -58,8 +61,7 @@ Direct invocation:
 ```sh
 ./build/pocket-music \
   --music "/path/to/Music" \
-  --state "/path/to/playback-state" \
-  --preferences "/path/to/preferences"
+  --state "/path/to/playback-state"
 ```
 
 Add `--fullscreen` to use the current desktop display.
@@ -112,7 +114,7 @@ The package is written to `build/trimui/PocketMusic/`. Copy that `PocketMusic` d
 `Apps/` on the Stock OS SD card. The launcher:
 
 - reads music from `/mnt/SDCARD/Music`
-- stores state and preferences in `Apps/PocketMusic/data`
+- stores playback state in `Apps/PocketMusic/data`
 - writes runtime output to `/mnt/SDCARD/pocket-music.log`
 - uses SDL libraries supplied by Stock OS
 
@@ -120,8 +122,13 @@ The package cross-compiles as AArch64 C++17 and statically links the pinned FFmp
 builds. The macOS build uses C++20. Playback-state format version 1 remains compatible with current
 builds; unknown fields are ignored and invalid state falls back safely to defaults.
 
-Native FFmpeg/SDL playback has been exercised on the TrimUI Brick Hammer. Suspend, resume, and every
-Stock OS firmware revision are not covered by automated tests.
+Runtime artwork is limited to `background-hello-kitty-v6.png`, `fallback-vinyl.png`, `icon.png`,
+and the bundled Noto Sans font. `app-icon-source.png` is retained as the editable source for future
+icon exports.
+
+Native FFmpeg/SDL playback, library navigation, controller input, and paused session restore have
+been exercised on the TrimUI Brick Hammer. Suspend/resume behavior and every Stock OS firmware
+revision are not covered by automated tests.
 
 ## Verification
 
@@ -132,7 +139,7 @@ make test
 CTest runs:
 
 - unit tests for scanning, playlists, navigation, input mapping, queue policies, persistence,
-  themes, and playback lifecycle
+  theme/layout primitives, and playback lifecycle
 - a smoke scan against `Music/`
 - an FFmpeg/SDL integration test with a generated WAV and SDL's dummy audio driver
 

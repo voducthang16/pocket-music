@@ -34,5 +34,6 @@ format:
 	$(FORMATTER) -i $(SOURCES)
 
 trimui-package:
+	$(CMAKE) -E remove_directory $(BUILD_DIR)/trimui
 	docker buildx build --pull=false --file platform/trimui/Dockerfile \
 		--output type=local,dest=build/trimui .

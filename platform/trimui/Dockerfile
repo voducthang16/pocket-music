@@ -77,6 +77,8 @@ RUN cmake -S /src -B /tmp/pocket-music-build \
 RUN mkdir -p /package/PocketMusic/assets/fonts /package/PocketMusic/bin /package/PocketMusic/data \
     && cp /tmp/pocket-music-build/pocket-music /package/PocketMusic/bin/ \
     && cp /src/assets/fonts/NotoSans-Regular.ttf /package/PocketMusic/assets/fonts/ \
+    && cp /src/assets/background-hello-kitty-v6.png /package/PocketMusic/assets/ \
+    && cp /src/assets/fallback-vinyl.png /package/PocketMusic/assets/ \
     && cp /src/assets/icon.png /package/PocketMusic/icon.png \
     && cp /src/platform/trimui/config.json /src/platform/trimui/launch.sh /package/PocketMusic/ \
     && chmod +x /package/PocketMusic/launch.sh /package/PocketMusic/bin/pocket-music

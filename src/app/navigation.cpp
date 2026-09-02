@@ -96,7 +96,8 @@ void navigateBack(AppState& app) {
             buildHomeView(app);
             return;
         }
-        app.running = false;
+        app.exitConfirmationOpen = true;
+        app.exitConfirmationSelection = 0;
         return;
     }
     app.view = std::move(app.history.back());

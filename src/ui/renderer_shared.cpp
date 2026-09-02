@@ -22,6 +22,11 @@ std::string repeatLabel(const AppState& app) {
 
 void drawButtonHints(AppState& app) {
     constexpr int y = layout::footerTextY;
+    if (app.exitConfirmationOpen) {
+        drawText(app.renderer, app.smallFont, "A  CONFIRM", 384, y, app.theme.accent, 220, true);
+        drawText(app.renderer, app.smallFont, "B  STAY", 640, y, app.theme.textMuted, 220, true);
+        return;
+    }
     const bool nowPlaying = app.view.screen == Screen::NowPlaying;
     drawText(app.renderer, app.smallFont, nowPlaying ? "START  PLAY / PAUSE" : "A  SELECT", 128, y,
              app.theme.text, 230, true);
@@ -32,6 +37,37 @@ void drawButtonHints(AppState& app) {
     drawText(app.renderer, app.smallFont, "SELECT  " + repeatLabel(app), 896, y,
              app.playback.repeatMode() == RepeatMode::Off ? app.theme.textMuted : app.theme.accent,
              230, true);
+}
+
+void drawExitConfirmation(AppState& app) {
+    SDL_Color veil = app.theme.text;
+    veil.a = 46;
+    fillRect(app.renderer, {0, 0, layout::width, layout::height - layout::footerHeight}, veil);
+
+    constexpr SDL_Rect frame{212, 214, 600, 276};
+    fillRoundedRect(app.renderer, frame, 22, app.theme.accentSoft);
+    SDL_Color panel = app.theme.surface;
+    panel.a = 250;
+    fillRoundedRect(app.renderer, {frame.x + 3, frame.y + 3, frame.w - 6, frame.h - 6}, 20,
+                    panel);
+
+    drawText(app.renderer, app.titleFont, "Leave Pocket Music?", layout::width / 2, frame.y + 42,
+             app.theme.text, 520, true);
+    drawText(app.renderer, app.smallFont, "Your place will be saved for next time.",
+             layout::width / 2, frame.y + 100, app.theme.textMuted, 520, true);
+
+    constexpr SDL_Rect stay{276, 370, 216, 68};
+    constexpr SDL_Rect exit{532, 370, 216, 68};
+    const SDL_Rect buttons[] = {stay, exit};
+    const char* labels[] = {"Stay", "Exit"};
+    for (int index = 0; index < 2; ++index) {
+        const bool selected = app.exitConfirmationSelection == index;
+        fillRoundedRect(app.renderer, buttons[index], 14,
+                        selected ? app.theme.accent : app.theme.surfaceRaised);
+        drawText(app.renderer, app.bodyFont, labels[index], buttons[index].x + buttons[index].w / 2,
+                 buttons[index].y + 15, selected ? app.theme.background : app.theme.text, 180,
+                 true);
+    }
 }
 
 namespace {

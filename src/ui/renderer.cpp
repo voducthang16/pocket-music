@@ -33,6 +33,7 @@ void renderApp(AppState& app) {
         drawText(app.renderer, app.smallFont, app.message, banner.x + 18, banner.y + 10,
                  app.theme.accent, banner.w - 36);
     }
+    if (app.exitConfirmationOpen) drawExitConfirmation(app);
     drawButtonHints(app);
     SDL_RenderPresent(app.renderer);
 }

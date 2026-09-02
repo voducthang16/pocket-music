@@ -118,7 +118,27 @@ void restoredNowPlayingBackReturnsToHome() {
     require(app.history.empty(), "restored fallback must not create synthetic history");
 
     navigateBack(app);
-    require(!app.running, "Back from Home must exit the app");
+    require(app.running && app.exitConfirmationOpen,
+            "Back from Home must request confirmation without exiting");
+}
+
+void homeExitRequiresConfirmation() {
+    TemporaryDirectory temporary;
+    AppState app(temporary.path / "Music", std::make_unique<FakePlayer>());
+    buildHomeView(app);
+
+    handleKey(app, SDLK_b);
+    require(app.running && app.exitConfirmationOpen && app.exitConfirmationSelection == 0,
+            "Home Back must open exit confirmation on Stay");
+
+    handleKey(app, SDLK_RETURN);
+    require(app.running && !app.exitConfirmationOpen,
+            "confirming Stay must close the dialog and keep running");
+
+    handleKey(app, SDLK_b);
+    handleKey(app, SDLK_RIGHT);
+    handleKey(app, SDLK_RETURN);
+    require(!app.running, "confirming Exit must stop the app");
 }
 
 void linerNotesReturnsToHome() {
@@ -158,6 +178,7 @@ void addNavigationTests(TestCases& tests) {
     tests.emplace_back("TrimUI Select repeat mapping", trimuiSelectCyclesRepeatMode);
     tests.emplace_back("restored Now Playing back returns to Home",
                        restoredNowPlayingBackReturnsToHome);
+    tests.emplace_back("Home exit requires confirmation", homeExitRequiresConfirmation);
     tests.emplace_back("Liner Notes returns to Home", linerNotesReturnsToHome);
     tests.emplace_back("Now Playing uses one navigation path",
                        openingNowPlayingUsesOneNavigationPath);

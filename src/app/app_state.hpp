@@ -49,6 +49,8 @@ struct AppState {
     ViewState view;
     std::vector<ViewState> history;
     bool running = true;
+    bool exitConfirmationOpen = false;
+    int exitConfirmationSelection = 0;
     std::string message;
     std::map<std::string, SDL_Texture*> coverCache;
     std::vector<SDL_GameController*> controllers;

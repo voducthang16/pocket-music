@@ -3,6 +3,32 @@
 #include "app/navigation.hpp"
 #include "ui/layout.hpp"
 void handleKey(AppState& app, SDL_Keycode code) {
+    if (app.exitConfirmationOpen) {
+        switch (code) {
+            case SDLK_LEFT:
+            case SDLK_UP:
+                app.exitConfirmationSelection = 0;
+                break;
+            case SDLK_RIGHT:
+            case SDLK_DOWN:
+                app.exitConfirmationSelection = 1;
+                break;
+            case SDLK_RETURN:
+            case SDLK_a:
+                if (app.exitConfirmationSelection == 1)
+                    app.running = false;
+                else
+                    app.exitConfirmationOpen = false;
+                break;
+            case SDLK_ESCAPE:
+            case SDLK_b:
+                app.exitConfirmationOpen = false;
+                break;
+            default:
+                break;
+        }
+        return;
+    }
     const auto& items = app.view.items;
     switch (code) {
         case SDLK_UP:

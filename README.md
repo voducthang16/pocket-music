@@ -77,7 +77,7 @@ pairs in reverse (A/B and X/Y), and the input adapter normalizes that hardware d
 | Up / Down | D-pad Up / Down | Move selection |
 | Left / Right | D-pad Left / Right | Seek backward / forward 10 seconds |
 | Enter or A | A | Select / play |
-| Escape or B | B | Back; exit from Home |
+| Escape or B | B | Back; open exit confirmation from Home |
 | Space or S | Start / `+` | Play / pause; retry a failed load |
 | Q / E | L1 / R1 | Previous / next track |
 | X | X | Open Now Playing |
@@ -149,8 +149,13 @@ CTest runs:
 Verify the target build separately with `make trimui-package`. Physical display, controls,
 speakers, and SD-card behavior still require a final check on the handheld.
 
-## Licenses
+## License
+
+Pocket Music source code is available under the [MIT License](LICENSE). You may use, modify,
+redistribute, and use the code commercially as long as the copyright and license notice remain
+with the software. The software is provided without warranty.
 
 The bundled Noto Sans font uses the SIL Open Font License in `assets/fonts/OFL.txt`. FFmpeg and
 TagLib are fetched at pinned commits by the Docker build; review their upstream licenses when
-changing build options or redistributing the package.
+changing build options or redistributing the package. Character-inspired artwork and third-party
+marks are not covered by the MIT License and remain subject to their respective owners' rights.

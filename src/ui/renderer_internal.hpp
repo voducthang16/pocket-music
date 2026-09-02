@@ -9,6 +9,7 @@
 std::string formatDuration(int seconds);
 std::string repeatLabel(const AppState& app);
 void drawButtonHints(AppState& app);
+void drawExitConfirmation(AppState& app);
 void drawHomeRow(AppState& app, const ViewItem& item, int index, int y, bool active,
                  const std::string& trailing = {}, bool chevron = false);
 void drawTrackRow(AppState& app, const ViewItem& item, int index, int y, bool active,

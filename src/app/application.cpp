@@ -74,7 +74,7 @@ void restore(AppState& app, const std::filesystem::path& path) {
                              std::move(resolved->history), resolved->cursor, app.session.shuffle,
                              app.session.positionSeconds, app.session.sourceTitle) &&
         app.session.screen == "now-playing")
-        app.view = {Screen::NowPlaying, "Now Playing", "POCKET MUSIC", {}, 0, 0};
+        app.view = {Screen::NowPlaying, "Now Playing", "", {}, 0, 0};
 }
 
 void persist(AppState& app, const std::filesystem::path& path) {

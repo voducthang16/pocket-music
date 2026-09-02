@@ -86,10 +86,25 @@ void trimuiFaceButtonMapping() {
     handleControllerButton(app, SDL_CONTROLLER_BUTTON_A);
     require(app.view.screen == Screen::Library, "TrimUI B button must navigate back");
 }
+
+void trimuiSelectCyclesRepeatMode() {
+    TemporaryDirectory temporary;
+    AppState app(temporary.path / "Music", std::make_unique<FakePlayer>());
+
+    handleControllerButton(app, SDL_CONTROLLER_BUTTON_BACK);
+    require(app.playback.repeatMode() == RepeatMode::One, "TrimUI Select must enable repeat one");
+    handleControllerButton(app, SDL_CONTROLLER_BUTTON_BACK);
+    require(app.playback.repeatMode() == RepeatMode::All,
+            "TrimUI Select must advance to repeat all");
+    handleControllerButton(app, SDL_CONTROLLER_BUTTON_BACK);
+    require(app.playback.repeatMode() == RepeatMode::Off,
+            "TrimUI Select must cycle repeat back to off");
+}
 }  // namespace
 void addNavigationTests(TestCases& tests) {
     tests.emplace_back("navigation queue", navigationQueue);
     tests.emplace_back("failed load", failedLoad);
     tests.emplace_back("theme settings", themeSettingsUseNavigationStack);
     tests.emplace_back("TrimUI face button mapping", trimuiFaceButtonMapping);
+    tests.emplace_back("TrimUI Select repeat mapping", trimuiSelectCyclesRepeatMode);
 }

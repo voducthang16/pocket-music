@@ -170,6 +170,19 @@ void togglingShufflePreservesCurrentTrack() {
             "disabling shuffle must restore source order around the current track");
 }
 
+void shuffledPlaybackWrapsAfterEveryTrack() {
+    PlaybackFixture fixture;
+    fixture.controller->play(0, fixture.library.allTrackIndexes());
+    fixture.controller->setShuffle(true, 42);
+    fixture.controller->next();
+    fixture.controller->next();
+    fixture.controller->next();
+    require(fixture.player->loadCount == 4,
+            "shuffle next must start a new cycle after every track has played");
+    require(fixture.controller->snapshot().phase != PlaybackPhase::Finished,
+            "shuffle next must not stop at the queue boundary");
+}
+
 void duplicatePlaylistEntriesArePreserved() {
     PlaybackQueue queue;
     queue.reset({0, 1, 1, 2}, 2, true, 11);
@@ -193,5 +206,6 @@ void addPlaybackTests(TestCases& tests) {
     tests.emplace_back("paused restore", restoredQueueStartsPaused);
     tests.emplace_back("bounded error skipping", automaticErrorsSkipWithBoundedAttempts);
     tests.emplace_back("shuffle toggle", togglingShufflePreservesCurrentTrack);
+    tests.emplace_back("shuffle wraps", shuffledPlaybackWrapsAfterEveryTrack);
     tests.emplace_back("duplicate queue entries", duplicatePlaylistEntriesArePreserved);
 }

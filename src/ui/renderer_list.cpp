@@ -33,20 +33,29 @@ void drawListScreen(AppState& app) {
     for (int row = 0; row < visibleRows && app.view.scroll + row < static_cast<int>(items.size());
          ++row) {
         const int index = app.view.scroll + row;
-        const int y = 102 + row * 96;
+        const int y = layout::headerHeight + row * 72;
         const bool active = index == app.view.selected;
         if (active) {
-            fillRect(app.renderer, {layout::pagePadding, y, 928, 86}, app.theme.surfaceRaised);
-            fillRect(app.renderer, {layout::pagePadding, y, 5, 86}, app.theme.accent);
+            fillRect(app.renderer, {layout::pagePadding, y, 928, 72}, app.theme.text);
+            fillRect(app.renderer, {layout::pagePadding, y, 6, 72}, app.theme.accent);
+        } else if (row > 0) {
+            fillRect(app.renderer, {layout::pagePadding, y, 928, 1}, app.theme.divider);
         }
-        drawText(app.renderer, app.bodyFont, items[index].title, 68, y + 10, app.theme.text, 680);
+        const SDL_Color primary = active ? app.theme.background : app.theme.text;
+        const SDL_Color secondary = active ? app.theme.surface : app.theme.textMuted;
+        const std::string number =
+            index < 9 ? "0" + std::to_string(index + 1) : std::to_string(index + 1);
+        drawText(app.renderer, app.smallFont, number, 72, y + 23,
+                 active ? app.theme.accent : app.theme.textMuted, 52);
+        drawText(app.renderer, app.bodyFont, items[index].title, 142, y + 8, primary, 610);
         const Track* track = trackForRow(app, index);
         const std::string subtitle =
             track ? track->artist + "  ·  " + track->album : items[index].subtitle;
-        drawText(app.renderer, app.smallFont, subtitle, 68, y + 51, app.theme.textMuted, 700);
+        drawText(app.renderer, app.smallFont, subtitle, 142, y + 43, secondary, 610);
         if (track)
-            drawText(app.renderer, app.smallFont, formatDuration(track->durationSeconds), 850,
-                     y + 28, app.theme.textMuted, 80);
-        drawChevron(app.renderer, 950, y + 42, active ? app.theme.accent : app.theme.textMuted);
+            drawText(app.renderer, app.smallFont, formatDuration(track->durationSeconds), 858,
+                     y + 23, secondary, 74);
+        drawChevron(app.renderer, 950, y + 36, active ? app.theme.accent : app.theme.textMuted);
     }
+    drawNowPlayingBand(app);
 }

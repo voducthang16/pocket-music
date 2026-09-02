@@ -47,8 +47,8 @@ bool PlaybackController::requestLoad(size_t trackIndex, double resumeSeconds, bo
         ++revision_;
         return false;
     }
-    pendingLoad_ = PendingLoad{generation, trackIndex, std::max(0.0, resumeSeconds), startPaused,
-                               false, origin};
+    pendingLoad_ = PendingLoad{generation,  trackIndex, std::max(0.0, resumeSeconds),
+                               startPaused, false,      origin};
     failedLoad_.reset();
     if (origin != LoadOrigin::Automatic) automaticFailures_ = 0;
     snapshot_.phase = PlaybackPhase::Loading;
@@ -116,17 +116,21 @@ void PlaybackController::handle(const PlayerEvent& event) {
             if (event.type == PlayerEventType::Failed && pendingLoad_ &&
                 pendingLoad_->origin == LoadOrigin::Automatic &&
                 ++automaticFailures_ < queue_.source().size()) {
-                if (const auto nextTrack = queue_.next(repeatMode_ == RepeatMode::All)) {
+                if (const auto nextTrack = queue_.next(cyclesQueue())) {
                     requestLoad(*nextTrack, 0, false, LoadOrigin::Automatic);
                     break;
                 }
             }
             if (pendingLoad_)
-                failedLoad_ = FailedLoad{pendingLoad_->trackIndex, pendingLoad_->resumeSeconds,
-                                         pendingLoad_->startPaused, {}, 0, {}};
+                failedLoad_ = FailedLoad{pendingLoad_->trackIndex,
+                                         pendingLoad_->resumeSeconds,
+                                         pendingLoad_->startPaused,
+                                         {},
+                                         0,
+                                         {}};
             else if (snapshot_.trackIndex)
-                failedLoad_ = FailedLoad{*snapshot_.trackIndex, snapshot_.positionSeconds, true,
-                                         {}, 0, {}};
+                failedLoad_ =
+                    FailedLoad{*snapshot_.trackIndex, snapshot_.positionSeconds, true, {}, 0, {}};
             pendingLoad_.reset();
             snapshot_.phase = PlaybackPhase::Error;
             snapshot_.errorMessage = event.message.empty() ? "Playback failed" : event.message;
@@ -141,7 +145,7 @@ void PlaybackController::advanceAfterEnd() {
         requestLoad(*snapshot_.trackIndex, 0, false, LoadOrigin::Automatic);
         return;
     }
-    const auto track = queue_.next(repeatMode_ == RepeatMode::All);
+    const auto track = queue_.next(cyclesQueue());
     if (track)
         requestLoad(*track, 0, false, LoadOrigin::Automatic);
     else {
@@ -165,11 +169,15 @@ void PlaybackController::seekRelative(int seconds) {
 
 void PlaybackController::next() {
     if (queue_.empty()) return;
-    if (const auto track = queue_.next(repeatMode_ == RepeatMode::All))
+    if (const auto track = queue_.next(cyclesQueue()))
         requestLoad(*track, 0, false, LoadOrigin::User);
     else
         snapshot_.phase = PlaybackPhase::Finished;
     ++revision_;
+}
+
+bool PlaybackController::cyclesQueue() const {
+    return queue_.shuffle() || repeatMode_ == RepeatMode::All;
 }
 
 void PlaybackController::previous() {

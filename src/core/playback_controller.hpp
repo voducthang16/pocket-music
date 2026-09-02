@@ -69,6 +69,7 @@ class PlaybackController {
     };
 
     bool requestLoad(size_t trackIndex, double resumeSeconds, bool startPaused, LoadOrigin origin);
+    bool cyclesQueue() const;
     void handle(const PlayerEvent& event);
     void advanceAfterEnd();
 

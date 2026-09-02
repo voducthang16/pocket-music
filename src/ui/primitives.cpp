@@ -91,13 +91,19 @@ void drawChevron(SDL_Renderer* r, int x, int y, SDL_Color c) {
         SDL_RenderDrawLine(r, x + 7 + t, y, x - 5 + t, y + 12);
     }
 }
-void drawPlayState(SDL_Renderer* r, int x, int y, bool paused, SDL_Color c) {
+void drawPlayState(SDL_Renderer* r, int x, int y, bool showPause, SDL_Color c) {
     SDL_SetRenderDrawColor(r, c.r, c.g, c.b, c.a);
-    if (paused) {
-        SDL_Rect a{x, y, 5, 18}, b{x + 10, y, 5, 18};
-        SDL_RenderFillRect(r, &a);
-        SDL_RenderFillRect(r, &b);
+    if (showPause) {
+        const SDL_Rect left{x, y, 7, 26};
+        const SDL_Rect right{x + 14, y, 7, 26};
+        SDL_RenderFillRect(r, &left);
+        SDL_RenderFillRect(r, &right);
         return;
     }
-    for (int i = 0; i < 8; ++i) SDL_RenderDrawLine(r, x + i, y + i, x + i, y + 18 - i);
+    constexpr int center = 13;
+    for (int row = 0; row <= center * 2; ++row) {
+        const int halfWidth = center - std::abs(row - center);
+        const int width = 2 + halfWidth * 20 / center;
+        SDL_RenderDrawLine(r, x, y + row, x + width, y + row);
+    }
 }

@@ -10,4 +10,4 @@ void drawText(SDL_Renderer*, TTF_Font*, const std::string&, int, int, SDL_Color,
 void drawMarqueeText(SDL_Renderer*, TTF_Font*, const std::string&, const SDL_Rect&, SDL_Color,
                      Uint64);
 void drawChevron(SDL_Renderer*, int, int, SDL_Color);
-void drawPlayState(SDL_Renderer*, int, int, bool, SDL_Color);
+void drawPlayState(SDL_Renderer*, int, int, bool showPause, SDL_Color);

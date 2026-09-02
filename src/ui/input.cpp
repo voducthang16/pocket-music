@@ -44,7 +44,7 @@ void handleKey(AppState& app, SDL_Keycode code) {
         case SDLK_x:
             if (app.playback.snapshot().trackIndex && app.view.screen != Screen::NowPlaying) {
                 app.history.push_back(std::move(app.view));
-                app.view = {Screen::NowPlaying, "Now Playing", "POCKET MUSIC", {}, 0, 0};
+                app.view = {Screen::NowPlaying, "Now Playing", "", {}, 0, 0};
             }
             break;
         case SDLK_y:
@@ -80,6 +80,9 @@ void handleControllerButton(AppState& app, Uint8 b) {
             break;
         case SDL_CONTROLLER_BUTTON_START:
             handleKey(app, SDLK_SPACE);
+            break;
+        case SDL_CONTROLLER_BUTTON_BACK:
+            handleKey(app, SDLK_r);
             break;
         case SDL_CONTROLLER_BUTTON_LEFTSHOULDER:
             handleKey(app, SDLK_q);

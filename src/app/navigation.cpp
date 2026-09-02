@@ -74,7 +74,7 @@ bool playTrack(AppState& app, size_t trackIndex, const std::vector<size_t>& queu
     }
     app.message.clear();
     if (app.view.screen != Screen::NowPlaying)
-        pushView(app, {Screen::NowPlaying, "Now Playing", "POCKET MUSIC", {}, 0, 0});
+        pushView(app, {Screen::NowPlaying, "Now Playing", "", {}, 0, 0});
     return true;
 }
 
@@ -112,7 +112,7 @@ void selectCurrentItem(AppState& app) {
         }
         case ViewAction::OpenNowPlaying:
             if (app.playback.snapshot().trackIndex)
-                pushView(app, {Screen::NowPlaying, "Now Playing", "POCKET MUSIC", {}, 0, 0});
+                pushView(app, {Screen::NowPlaying, "Now Playing", "", {}, 0, 0});
             return;
         case ViewAction::OpenSettings: {
             const auto selectedTheme = app.preferences.theme == ThemeMode::Dark ? "Dark" : "Light";

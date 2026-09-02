@@ -61,8 +61,7 @@ bool initializeUi(AppState& app, bool fullscreen) {
         SDL_SetRenderDrawBlendMode(app.renderer, SDL_BLENDMODE_BLEND);
         app.backgroundTexture =
             loadResourceTexture(app.renderer, "assets/background-hello-kitty-v6.png");
-        app.fallbackVinylTexture =
-            loadResourceTexture(app.renderer, "assets/fallback-vinyl.png");
+        app.fallbackVinylTexture = loadResourceTexture(app.renderer, "assets/fallback-vinyl.png");
     }
     const auto font = fontPath();
     app.titleFont = TTF_OpenFont(font.c_str(), 36);
@@ -125,7 +124,7 @@ int runApplication(const std::filesystem::path& musicPath, const std::filesystem
         std::cerr << "Music scan failed: " << app.library.error() << '\n';
         app.message = app.library.error();
     }
-    buildLibraryView(app);
+    buildHomeView(app);
     if (!initializeUi(app, fullscreen)) {
         destroyUi(app);
         return 1;

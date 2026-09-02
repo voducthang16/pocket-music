@@ -9,8 +9,8 @@ void drawTransport(AppState& app, const Track* track) {
     constexpr int y = layout::miniPlayerY;
     drawPlaybackSurface(app);
     if (!track) {
-        drawText(app.renderer, app.bodyFont, "Choose a song from Library", layout::width / 2,
-                 y + 66, app.theme.text, 420, true);
+        drawText(app.renderer, app.bodyFont, "Choose a song from Home", layout::width / 2, y + 66,
+                 app.theme.text, 420, true);
         return;
     }
 
@@ -24,10 +24,9 @@ void drawTransport(AppState& app, const Track* track) {
     drawText(app.renderer, app.smallFont, "L1  PREVIOUS", 252, y + 105, app.theme.textMuted, 180,
              true);
     drawPlayState(app.renderer, 501, y + 91, !paused, app.theme.accent);
-    drawText(app.renderer, app.smallFont, paused ? "PLAY" : "PAUSE", 512, y + 129,
-             app.theme.text, 100, true);
-    drawText(app.renderer, app.smallFont, "R1  NEXT", 772, y + 105, app.theme.textMuted, 180,
-             true);
+    drawText(app.renderer, app.smallFont, paused ? "PLAY" : "PAUSE", 512, y + 129, app.theme.text,
+             100, true);
+    drawText(app.renderer, app.smallFont, "R1  NEXT", 772, y + 105, app.theme.textMuted, 180, true);
 
     std::string status;
     if (playback.phase == PlaybackPhase::Loading) status = "LOADING";
@@ -51,8 +50,8 @@ void drawNowPlayingScreen(AppState& app) {
                  layout::nowPlayingMetadataX, 142, app.theme.textMuted,
                  layout::nowPlayingMetadataWidth);
         drawCover(app, nullptr,
-                  {layout::nowPlayingCoverX, layout::nowPlayingCoverY,
-                   layout::nowPlayingCoverSize, layout::nowPlayingCoverSize});
+                  {layout::nowPlayingCoverX, layout::nowPlayingCoverY, layout::nowPlayingCoverSize,
+                   layout::nowPlayingCoverSize});
         drawTransport(app, nullptr);
         return;
     }

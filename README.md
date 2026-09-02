@@ -9,8 +9,8 @@ an external media-player process.
 
 ## Features
 
-- Browse songs, albums, artists, and local M3U/M3U8 playlists
-- Read Unicode title, artist, album, track number, and duration metadata with TagLib
+- Browse every supported audio file from one Songs list
+- Read Unicode title, artist, album, and duration metadata with TagLib
 - Play MP3, FLAC, WAV, OGG Vorbis, and OGG Opus
 - Show `cover.jpg`, `cover.png`, `folder.jpg`, or `folder.png` from an album directory
 - Play/pause, seek, previous/next, shuffle, and repeat
@@ -18,7 +18,8 @@ an external media-player process.
 - Preserve playback history and apply the three-second Previous behavior
 - Restore queue, shuffle order, history, repeat mode, and position in a paused state
 - Handle loading, finished, empty-library, and recoverable playback-error states
-- Return from a restored Now Playing session to Library before exiting the app
+- Open Songs, Now Playing, and the music-themed Liner Notes app information from Home
+- Return from a restored Now Playing session to Home before exiting the app
 - Navigate with a keyboard or SDL game controller
 - Use a pastel vintage stationery art direction: warm ivory paper, blush watercolor, pressed
   flowers, soft cocoa details, and a small Hello Kitty cassette vignette kept outside the UI-safe
@@ -68,15 +69,15 @@ Add `--fullscreen` to use the current desktop display.
 
 ## Controls
 
-The face-button names refer to the labels printed on the Hammer. SDL reports its A/B buttons in
-reverse, and the input adapter normalizes that hardware detail.
+The face-button names refer to the labels printed on the Hammer. SDL reports both face-button
+pairs in reverse (A/B and X/Y), and the input adapter normalizes that hardware detail.
 
 | Keyboard | TrimUI Brick Hammer | Action |
 | --- | --- | --- |
 | Up / Down | D-pad Up / Down | Move selection |
 | Left / Right | D-pad Left / Right | Seek backward / forward 10 seconds |
 | Enter or A | A | Select / play |
-| Escape or B | B | Back; exit from Library |
+| Escape or B | B | Back; exit from Home |
 | Space or S | Start / `+` | Play / pause; retry a failed load |
 | Q / E | L1 / R1 | Previous / next track |
 | X | X | Open Now Playing |
@@ -97,10 +98,10 @@ Music/
     Album/
       cover.jpg
       01 - Song.mp3
-  Favorites.m3u
 ```
 
-Playlist entries may be absolute or relative to the playlist file. Network entries are ignored.
+Folder names do not define navigation groups. Pocket Music recursively adds supported audio files
+to Songs and uses file metadata only for track details.
 
 ## TrimUI Stock OS package
 
@@ -119,14 +120,16 @@ The package is written to `build/trimui/PocketMusic/`. Copy that `PocketMusic` d
 - uses SDL libraries supplied by Stock OS
 
 The package cross-compiles as AArch64 C++17 and statically links the pinned FFmpeg and TagLib
-builds. The macOS build uses C++20. Playback-state format version 1 remains compatible with current
-builds; unknown fields are ignored and invalid state falls back safely to defaults.
+builds. The macOS build uses C++20. Invalid playback state falls back safely to defaults.
+
+Pushing a tag matching the CMake project version, such as `v0.1.0`, builds
+`PocketMusic-v0.1.0.zip` and publishes it to GitHub Releases.
 
 Runtime artwork is limited to `background-hello-kitty-v6.png`, `fallback-vinyl.png`, `icon.png`,
 and the bundled Noto Sans font. `app-icon-source.png` is retained as the editable source for future
 icon exports.
 
-Native FFmpeg/SDL playback, library navigation, controller input, and paused session restore have
+Native FFmpeg/SDL playback, Home/Songs navigation, controller input, and paused session restore have
 been exercised on the TrimUI Brick Hammer. Suspend/resume behavior and every Stock OS firmware
 revision are not covered by automated tests.
 
@@ -138,7 +141,7 @@ make test
 
 CTest runs:
 
-- unit tests for scanning, playlists, navigation, input mapping, queue policies, persistence,
+- unit tests for scanning, navigation, input mapping, queue policies, persistence,
   theme/layout primitives, and playback lifecycle
 - a smoke scan against `Music/`
 - an FFmpeg/SDL integration test with a generated WAV and SDL's dummy audio driver

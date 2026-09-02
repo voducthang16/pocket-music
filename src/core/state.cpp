@@ -36,12 +36,8 @@ PlaybackSession loadSession(const std::filesystem::path& path) {
     if (!stream) return defaults();
     PlaybackSession session;
     std::string key;
-    bool sawVersion = false;
     while (stream >> key) {
-        if (key == "version") {
-            stream >> session.version;
-            sawVersion = true;
-        } else if (key == "current")
+        if (key == "current")
             stream >> std::quoted(session.currentTrackPath);
         else if (key == "source_title")
             stream >> std::quoted(session.sourceTitle);
@@ -75,11 +71,10 @@ PlaybackSession loadSession(const std::filesystem::path& path) {
         }
         if (!stream) return defaults();
     }
-    if (!sawVersion || session.version != PlaybackSession::currentVersion) return defaults();
     if (!std::isfinite(session.positionSeconds) || session.positionSeconds < 0)
         session.positionSeconds = 0;
     if (session.repeatMode < 0 || session.repeatMode > 2) session.repeatMode = 0;
-    if (session.screen != "library" && session.screen != "now-playing") session.screen = "library";
+    if (session.screen != "home" && session.screen != "now-playing") session.screen = "home";
     session.paused = true;
     if (!isConsistent(session)) return defaults();
     return session;
@@ -87,8 +82,7 @@ PlaybackSession loadSession(const std::filesystem::path& path) {
 
 bool saveSession(const std::filesystem::path& path, const PlaybackSession& session) {
     std::ostringstream stream;
-    stream << "version " << PlaybackSession::currentVersion << '\n'
-           << "current " << std::quoted(session.currentTrackPath) << '\n'
+    stream << "current " << std::quoted(session.currentTrackPath) << '\n'
            << "source_title " << std::quoted(session.sourceTitle) << '\n'
            << "cursor " << session.cursor << '\n'
            << "position " << std::setprecision(17)
@@ -100,7 +94,7 @@ bool saveSession(const std::filesystem::path& path, const PlaybackSession& sessi
            << "shuffle " << session.shuffle << '\n'
            << "repeat "
            << (session.repeatMode >= 0 && session.repeatMode <= 2 ? session.repeatMode : 0) << '\n'
-           << "screen " << std::quoted(session.screen == "now-playing" ? "now-playing" : "library")
+           << "screen " << std::quoted(session.screen == "now-playing" ? "now-playing" : "home")
            << '\n';
     for (const auto& value : session.sourcePaths) stream << "source " << std::quoted(value) << '\n';
     for (const auto& value : session.orderPaths) stream << "order " << std::quoted(value) << '\n';

@@ -183,7 +183,7 @@ void shuffledPlaybackWrapsAfterEveryTrack() {
             "shuffle next must not stop at the queue boundary");
 }
 
-void duplicatePlaylistEntriesArePreserved() {
+void duplicateQueueEntriesArePreserved() {
     PlaybackQueue queue;
     queue.reset({0, 1, 1, 2}, 2, true, 11);
     require(queue.sourcePosition() == 2,
@@ -191,7 +191,7 @@ void duplicatePlaylistEntriesArePreserved() {
     auto order = queue.order();
     std::sort(order.begin(), order.end());
     require(order == std::vector<size_t>({0, 1, 1, 2}),
-            "shuffle must preserve duplicate playlist entries");
+            "shuffle must preserve duplicate queue entries");
 }
 }  // namespace
 
@@ -207,5 +207,5 @@ void addPlaybackTests(TestCases& tests) {
     tests.emplace_back("bounded error skipping", automaticErrorsSkipWithBoundedAttempts);
     tests.emplace_back("shuffle toggle", togglingShufflePreservesCurrentTrack);
     tests.emplace_back("shuffle wraps", shuffledPlaybackWrapsAfterEveryTrack);
-    tests.emplace_back("duplicate queue entries", duplicatePlaylistEntriesArePreserved);
+    tests.emplace_back("duplicate queue entries", duplicateQueueEntriesArePreserved);
 }

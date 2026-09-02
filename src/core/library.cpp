@@ -6,11 +6,8 @@
 
 #include <algorithm>
 #include <cctype>
-#include <fstream>
-#include <map>
 #include <numeric>
 #include <set>
-#include <unordered_map>
 
 namespace fs = std::filesystem;
 
@@ -46,24 +43,12 @@ fs::path findCover(const fs::path& directory) {
     return {};
 }
 
-std::string canonicalKey(const fs::path& path) {
-    std::error_code error;
-    auto canonical = fs::weakly_canonical(path, error);
-    return error ? fs::absolute(path, error).lexically_normal().string() : canonical.string();
-}
-
-std::string trackCount(size_t count) {
-    return std::to_string(count) + (count == 1 ? " track" : " tracks");
-}
 }  // namespace
 
 MusicLibrary::MusicLibrary(fs::path root) : root_(std::move(root)) {}
 
 bool MusicLibrary::scan() {
     tracks_.clear();
-    playlists_.clear();
-    artists_.clear();
-    albums_.clear();
     allTrackIndexes_.clear();
     error_.clear();
 
@@ -73,7 +58,6 @@ bool MusicLibrary::scan() {
         return false;
     }
 
-    std::vector<fs::path> playlistPaths;
     fs::recursive_directory_iterator iterator(root_, fs::directory_options::skip_permission_denied,
                                               error);
     if (error) {
@@ -92,11 +76,6 @@ bool MusicLibrary::scan() {
         std::error_code typeError;
         if (!entry.is_regular_file(typeError)) continue;
         const auto path = entry.path();
-        const auto extension = lower(path.extension().string());
-        if (extension == ".m3u" || extension == ".m3u8") {
-            playlistPaths.push_back(path);
-            continue;
-        }
         if (isAppleDouble(path) || !isAudio(path)) continue;
 
         Track track;
@@ -111,7 +90,6 @@ bool MusicLibrary::scan() {
                 track.title = fallback(utf8(tag->title()), track.title);
                 track.artist = fallback(utf8(tag->artist()), track.artist);
                 track.album = fallback(utf8(tag->album()), track.album);
-                track.trackNumber = static_cast<int>(tag->track());
             }
             if (const auto* properties = file.audioProperties())
                 track.durationSeconds = properties->lengthInSeconds();
@@ -123,51 +101,5 @@ bool MusicLibrary::scan() {
               [](const Track& a, const Track& b) { return lower(a.title) < lower(b.title); });
     allTrackIndexes_.resize(tracks_.size());
     std::iota(allTrackIndexes_.begin(), allTrackIndexes_.end(), 0);
-
-    std::map<std::pair<std::string, std::string>, std::vector<size_t>> albums;
-    std::map<std::string, std::vector<size_t>> artists;
-    std::unordered_map<std::string, size_t> pathIndex;
-    for (size_t index = 0; index < tracks_.size(); ++index) {
-        albums[{tracks_[index].artist, tracks_[index].album}].push_back(index);
-        artists[tracks_[index].artist].push_back(index);
-        pathIndex[canonicalKey(tracks_[index].path)] = index;
-    }
-    for (auto& [key, indexes] : albums) {
-        std::stable_sort(indexes.begin(), indexes.end(), [&](size_t left, size_t right) {
-            const auto& a = tracks_[left];
-            const auto& b = tracks_[right];
-            if (a.trackNumber > 0 && b.trackNumber > 0 && a.trackNumber != b.trackNumber)
-                return a.trackNumber < b.trackNumber;
-            if ((a.trackNumber > 0) != (b.trackNumber > 0)) return a.trackNumber > 0;
-            return lower(a.title) < lower(b.title);
-        });
-        albums_.push_back({key.second, key.first + " - " + trackCount(indexes.size()), indexes});
-    }
-    std::sort(albums_.begin(), albums_.end(), [](const auto& a, const auto& b) {
-        if (lower(a.title) != lower(b.title)) return lower(a.title) < lower(b.title);
-        return lower(a.subtitle) < lower(b.subtitle);
-    });
-    for (auto& [artist, indexes] : artists)
-        artists_.push_back({artist, trackCount(indexes.size()), std::move(indexes)});
-
-    std::sort(playlistPaths.begin(), playlistPaths.end());
-    for (const auto& path : playlistPaths) {
-        Playlist playlist{path.stem().string(), path, {}};
-        std::ifstream stream(path);
-        std::string line;
-        bool firstLine = true;
-        while (std::getline(stream, line)) {
-            if (!line.empty() && line.back() == '\r') line.pop_back();
-            if (firstLine && line.compare(0, 3, "\xEF\xBB\xBF") == 0) line.erase(0, 3);
-            firstLine = false;
-            if (line.empty() || line.front() == '#' || line.find("://") != std::string::npos)
-                continue;
-            fs::path item(line);
-            if (!item.is_absolute()) item = path.parent_path() / item;
-            if (const auto found = pathIndex.find(canonicalKey(item)); found != pathIndex.end())
-                playlist.trackIndexes.push_back(found->second);
-        }
-        playlists_.push_back(std::move(playlist));
-    }
     return true;
 }

@@ -16,10 +16,10 @@ void navigationQueue() {
     auto* fake = player.get();
     AppState app(music, std::move(player));
     require(app.library.scan(), "navigation fixture must scan");
-    buildLibraryView(app);
+    buildHomeView(app);
     selectCurrentItem(app);
-    require(app.view.screen == Screen::Tracks && app.history.size() == 1,
-            "Songs must push a track view");
+    require(app.view.screen == Screen::Songs && app.history.size() == 1,
+            "Songs must push the Songs view");
     app.view.selected = 1;
     selectCurrentItem(app);
     require(app.view.screen == Screen::NowPlaying && app.history.size() == 2,
@@ -30,9 +30,9 @@ void navigationQueue() {
     require(app.playback.queue().current() == 0 && fake->loadCount == 2,
             "previous must move inside the active queue");
     navigateBack(app);
-    require(app.view.screen == Screen::Tracks, "first Back must restore the track view");
+    require(app.view.screen == Screen::Songs, "first Back must restore Songs");
     navigateBack(app);
-    require(app.view.screen == Screen::Library, "second Back must restore Library");
+    require(app.view.screen == Screen::Home, "second Back must restore Home");
 }
 void failedLoad() {
     TemporaryDirectory temporary;
@@ -42,12 +42,30 @@ void failedLoad() {
     player->loadSucceeds = false;
     AppState app(music, std::move(player));
     require(app.library.scan(), "failure fixture must scan");
-    buildLibraryView(app);
+    buildHomeView(app);
     require(!playTrack(app, 0, app.library.allTrackIndexes()), "load failure must propagate");
     require(
         !app.playback.snapshot().trackIndex && app.playback.queue().empty() && app.history.empty(),
         "load failure must not mutate navigation or queue state");
     require(!app.message.empty(), "load failure must be visible to the UI state");
+}
+
+void homeRowsExposePrimaryDestinations() {
+    TemporaryDirectory temporary;
+    const auto music = temporary.path / "Music";
+    touch(music / "Album" / "One.mp3");
+    touch(music / "Album" / "Two.mp3");
+    AppState app(music, std::make_unique<FakePlayer>());
+    require(app.library.scan(), "Home fixture must scan");
+
+    buildHomeView(app);
+
+    require(app.view.items[0].subtitle == "2", "Songs must expose a compact numeric count");
+    require(app.view.items.size() == 3, "Home must contain exactly three destinations");
+    require(app.view.items[1].title == "Now Playing" && app.view.items[1].subtitle.empty(),
+            "Now Playing must be a single-line destination");
+    require(app.view.items[2].title == "Liner Notes" && app.view.items[2].subtitle.empty(),
+            "Liner Notes must be a single-line destination");
 }
 
 void trimuiFaceButtonMapping() {
@@ -56,13 +74,22 @@ void trimuiFaceButtonMapping() {
     touch(music / "Song.mp3");
     AppState app(music, std::make_unique<FakePlayer>());
     require(app.library.scan(), "controller fixture must scan");
-    buildLibraryView(app);
+    buildHomeView(app);
 
     handleControllerButton(app, SDL_CONTROLLER_BUTTON_B);
-    require(app.view.screen == Screen::Tracks, "TrimUI A button must select the current item");
+    require(app.view.screen == Screen::Songs, "TrimUI A button must select Songs");
 
     handleControllerButton(app, SDL_CONTROLLER_BUTTON_A);
-    require(app.view.screen == Screen::Library, "TrimUI B button must navigate back");
+    require(app.view.screen == Screen::Home, "TrimUI B button must navigate back");
+
+    require(app.playback.play(0, app.library.allTrackIndexes()),
+            "controller fixture must start playback");
+    handleControllerButton(app, SDL_CONTROLLER_BUTTON_X);
+    require(app.playback.shuffle(), "TrimUI Y button must toggle shuffle");
+    require(app.view.screen == Screen::Home, "TrimUI Y button must not open Now Playing");
+
+    handleControllerButton(app, SDL_CONTROLLER_BUTTON_Y);
+    require(app.view.screen == Screen::NowPlaying, "TrimUI X button must open Now Playing");
 }
 
 void trimuiSelectCyclesRepeatMode() {
@@ -79,7 +106,7 @@ void trimuiSelectCyclesRepeatMode() {
             "TrimUI Select must cycle repeat back to off");
 }
 
-void restoredNowPlayingBackReturnsToLibrary() {
+void restoredNowPlayingBackReturnsToHome() {
     TemporaryDirectory temporary;
     AppState app(temporary.path / "Music", std::make_unique<FakePlayer>());
     app.view = nowPlayingView();
@@ -87,33 +114,24 @@ void restoredNowPlayingBackReturnsToLibrary() {
     navigateBack(app);
 
     require(app.running, "Back from restored Now Playing must keep the app running");
-    require(app.view.screen == Screen::Library,
-            "Back from restored Now Playing must return to Library");
+    require(app.view.screen == Screen::Home, "Back from restored Now Playing must return to Home");
     require(app.history.empty(), "restored fallback must not create synthetic history");
 
     navigateBack(app);
-    require(!app.running, "Back from root Library must still exit the app");
+    require(!app.running, "Back from Home must exit the app");
 }
 
-void libraryNowPlayingStatusRefreshesAfterPlaybackStarts() {
+void linerNotesReturnsToHome() {
     TemporaryDirectory temporary;
-    const auto music = temporary.path / "Music";
-    touch(music / "Song.mp3");
-    AppState app(music, std::make_unique<FakePlayer>());
-    require(app.library.scan(), "navigation fixture must scan");
-    buildLibraryView(app);
-    require(app.view.items[4].subtitle == "Nothing playing",
-            "Library must begin without a current track");
+    AppState app(temporary.path / "Music", std::make_unique<FakePlayer>());
+    buildHomeView(app);
+    app.view.selected = 2;
 
     selectCurrentItem(app);
-    selectCurrentItem(app);
-    navigateBack(app);
-    navigateBack(app);
+    require(app.view.screen == Screen::LinerNotes, "Home must open Liner Notes");
 
-    require(app.view.screen == Screen::Library,
-            "Back from a playing track must eventually restore Library");
-    require(app.view.items[4].subtitle == "Open current track",
-            "Library must refresh the Now Playing status after playback starts");
+    navigateBack(app);
+    require(app.view.screen == Screen::Home, "Back from Liner Notes must restore Home");
 }
 
 void openingNowPlayingUsesOneNavigationPath() {
@@ -122,7 +140,7 @@ void openingNowPlayingUsesOneNavigationPath() {
     touch(music / "Song.mp3");
     AppState app(music, std::make_unique<FakePlayer>());
     require(app.library.scan(), "navigation fixture must scan");
-    buildLibraryView(app);
+    buildHomeView(app);
     require(app.playback.play(0, app.library.allTrackIndexes()), "track load must begin");
 
     openNowPlaying(app);
@@ -135,12 +153,12 @@ void openingNowPlayingUsesOneNavigationPath() {
 void addNavigationTests(TestCases& tests) {
     tests.emplace_back("navigation queue", navigationQueue);
     tests.emplace_back("failed load", failedLoad);
+    tests.emplace_back("Home primary destinations", homeRowsExposePrimaryDestinations);
     tests.emplace_back("TrimUI face button mapping", trimuiFaceButtonMapping);
     tests.emplace_back("TrimUI Select repeat mapping", trimuiSelectCyclesRepeatMode);
-    tests.emplace_back("restored Now Playing back returns to Library",
-                       restoredNowPlayingBackReturnsToLibrary);
-    tests.emplace_back("Library Now Playing status refreshes",
-                       libraryNowPlayingStatusRefreshesAfterPlaybackStarts);
+    tests.emplace_back("restored Now Playing back returns to Home",
+                       restoredNowPlayingBackReturnsToHome);
+    tests.emplace_back("Liner Notes returns to Home", linerNotesReturnsToHome);
     tests.emplace_back("Now Playing uses one navigation path",
                        openingNowPlayingUsesOneNavigationPath);
 }

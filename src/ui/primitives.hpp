@@ -8,6 +8,8 @@ void fillRoundedRect(SDL_Renderer*, const SDL_Rect&, int radius, SDL_Color);
 void clearTextCache();
 void drawText(SDL_Renderer*, TTF_Font*, const std::string&, int, int, SDL_Color, int = 0,
               bool = false);
+void drawTextRightAligned(SDL_Renderer*, TTF_Font*, const std::string&, int right, int y,
+                          SDL_Color);
 void drawMarqueeText(SDL_Renderer*, TTF_Font*, const std::string&, const SDL_Rect&, SDL_Color,
                      Uint64);
 void drawChevron(SDL_Renderer*, int, int, SDL_Color);

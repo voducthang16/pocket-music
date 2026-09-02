@@ -11,18 +11,19 @@ void renderApp(AppState& app) {
     app.vinylLastTick = now;
     const auto phase = app.playback.snapshot().phase;
     const bool loading = phase == PlaybackPhase::Loading;
-    app.vinylAngle =
-        advanceVinylAngle(app.vinylAngle, elapsed, loading || phase == PlaybackPhase::Playing,
-                          loading);
+    app.vinylAngle = advanceVinylAngle(app.vinylAngle, elapsed,
+                                       loading || phase == PlaybackPhase::Playing, loading);
     fillRect(app.renderer, {0, 0, layout::width, layout::height}, app.theme.background);
     if (app.backgroundTexture)
         SDL_RenderCopy(app.renderer, app.backgroundTexture, nullptr, nullptr);
-    if (app.view.screen == Screen::Library)
-        drawLibraryScreen(app);
+    if (app.view.screen == Screen::Home)
+        drawHomeScreen(app);
     else if (app.view.screen == Screen::NowPlaying)
         drawNowPlayingScreen(app);
+    else if (app.view.screen == Screen::LinerNotes)
+        drawLinerNotesScreen(app);
     else
-        drawListScreen(app);
+        drawSongsScreen(app);
     if (!app.message.empty() && app.view.screen != Screen::NowPlaying) {
         const SDL_Rect banner{layout::messageBannerX, layout::messageBannerY,
                               layout::messageBannerWidth, layout::messageBannerHeight};

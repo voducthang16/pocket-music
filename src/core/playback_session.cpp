@@ -47,6 +47,6 @@ PlaybackSession capturePlaybackSession(const PlaybackController& playback,
     session.paused = snapshot.phase != PlaybackPhase::Playing;
     session.shuffle = playback.shuffle();
     session.repeatMode = static_cast<int>(playback.repeatMode());
-    session.screen = nowPlaying ? "now-playing" : "library";
+    session.screen = nowPlaying ? "now-playing" : "home";
     return session;
 }

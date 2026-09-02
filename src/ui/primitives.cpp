@@ -46,11 +46,10 @@ void fillRoundedRect(SDL_Renderer* r, const SDL_Rect& rect, int radius, SDL_Colo
         int inset = 0;
         if (edgeDistance < radius) {
             const int vertical = radius - edgeDistance - 1;
-            inset = radius - static_cast<int>(
-                                 std::sqrt(radius * radius - vertical * vertical));
+            inset = radius - static_cast<int>(std::sqrt(radius * radius - vertical * vertical));
         }
-        SDL_RenderDrawLine(r, rect.x + inset, rect.y + row,
-                           rect.x + rect.w - inset - 1, rect.y + row);
+        SDL_RenderDrawLine(r, rect.x + inset, rect.y + row, rect.x + rect.w - inset - 1,
+                           rect.y + row);
     }
 }
 void clearTextCache() {
@@ -77,6 +76,12 @@ void drawText(SDL_Renderer* r, TTF_Font* f, const std::string& value, int x, int
     SDL_Rect target{x, y, found->second.width, found->second.height};
     if (centered) target.x = x - target.w / 2;
     SDL_RenderCopy(r, found->second.texture, nullptr, &target);
+}
+void drawTextRightAligned(SDL_Renderer* r, TTF_Font* f, const std::string& value, int right, int y,
+                          SDL_Color c) {
+    int width = 0;
+    if (TTF_SizeUTF8(f, value.c_str(), &width, nullptr) != 0) return;
+    drawText(r, f, value, right - width, y, c);
 }
 void drawMarqueeText(SDL_Renderer* r, TTF_Font* f, const std::string& value, const SDL_Rect& bounds,
                      SDL_Color c, Uint64 clock) {

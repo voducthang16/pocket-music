@@ -27,27 +27,17 @@ void stateValidation() {
     require(actual.positionSeconds == 137.5 && actual.repeatMode == 2,
             "playback state must round-trip");
     require(actual.paused, "restored sessions must always start paused");
-    std::ofstream(path) << "version 1\nposition -40\nrepeat 99\nscreen \"removed-screen\"\n";
+    std::ofstream(path) << "position -40\nrepeat 99\nscreen \"removed-screen\"\n";
     const auto invalid = loadSession(path);
     require(invalid.positionSeconds == 0, "negative position must be rejected");
     require(invalid.repeatMode == 0, "invalid repeat mode must be rejected");
-    require(invalid.screen == "library", "invalid screen must be rejected");
-}
-
-void unsupportedSessionVersionUsesDefaults() {
-    TemporaryDirectory temporary;
-    const auto path = temporary.path / "state";
-    std::ofstream(path) << "version 99\ncurrent \"Song.mp3\"\n";
-    const auto session = loadSession(path);
-    require(session.currentTrackPath.empty() && session.sourcePaths.empty(),
-            "unsupported session versions must not be partially restored");
+    require(invalid.screen == "home", "invalid screen must be rejected");
 }
 
 void inconsistentSessionUsesDefaults() {
     TemporaryDirectory temporary;
     const auto path = temporary.path / "state";
-    std::ofstream(path) << "version 1\n"
-                           "current \"Missing.mp3\"\n"
+    std::ofstream(path) << "current \"Missing.mp3\"\n"
                            "source \"One.mp3\"\n"
                            "order \"One.mp3\"\n"
                            "cursor 4\n";
@@ -59,8 +49,7 @@ void inconsistentSessionUsesDefaults() {
 void sessionCurrentTrackMustMatchCursor() {
     TemporaryDirectory temporary;
     const auto path = temporary.path / "state";
-    std::ofstream(path) << "version 1\n"
-                           "current \"One.mp3\"\n"
+    std::ofstream(path) << "current \"One.mp3\"\n"
                            "source \"One.mp3\"\n"
                            "source \"Two.mp3\"\n"
                            "order \"One.mp3\"\n"
@@ -95,7 +84,6 @@ void missingCurrentTrackResolvesToNextEntry() {
 }  // namespace
 void addStateTests(TestCases& tests) {
     tests.emplace_back("state validation", stateValidation);
-    tests.emplace_back("state version", unsupportedSessionVersionUsesDefaults);
     tests.emplace_back("state consistency", inconsistentSessionUsesDefaults);
     tests.emplace_back("state current cursor", sessionCurrentTrackMustMatchCursor);
     tests.emplace_back("missing current track", missingCurrentTrackResolvesToNextEntry);

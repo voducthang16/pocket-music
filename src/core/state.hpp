@@ -5,8 +5,6 @@
 #include <vector>
 
 struct PlaybackSession {
-    static constexpr int currentVersion = 1;
-    int version = currentVersion;
     std::string currentTrackPath;
     std::string sourceTitle;
     std::vector<std::string> sourcePaths;
@@ -17,7 +15,7 @@ struct PlaybackSession {
     bool paused = true;
     bool shuffle = false;
     int repeatMode = 0;
-    std::string screen = "library";
+    std::string screen = "home";
 };
 
 PlaybackSession loadSession(const std::filesystem::path& path);

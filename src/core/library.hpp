@@ -11,9 +11,6 @@ class MusicLibrary {
     explicit MusicLibrary(std::filesystem::path root);
     bool scan();
     const std::vector<Track>& tracks() const { return tracks_; }
-    const std::vector<Playlist>& playlists() const { return playlists_; }
-    const std::vector<TrackGroup>& artists() const { return artists_; }
-    const std::vector<TrackGroup>& albums() const { return albums_; }
     const std::vector<size_t>& allTrackIndexes() const { return allTrackIndexes_; }
     const std::filesystem::path& root() const { return root_; }
     const std::string& error() const { return error_; }
@@ -21,9 +18,6 @@ class MusicLibrary {
    private:
     std::filesystem::path root_;
     std::vector<Track> tracks_;
-    std::vector<Playlist> playlists_;
-    std::vector<TrackGroup> artists_;
-    std::vector<TrackGroup> albums_;
     std::vector<size_t> allTrackIndexes_;
     std::string error_;
 };

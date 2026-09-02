@@ -3,17 +3,13 @@
 #include <algorithm>
 
 namespace {
-std::string countLabel(size_t count, const char* singular, const char* plural) {
-    return std::to_string(count) + ' ' + (count == 1 ? singular : plural);
-}
-
 ViewItem trackItem(const Track& track, size_t index) {
-    return {track.title, track.artist, ViewAction::None, {index}};
+    return {track.title, track.artist, ViewAction::None, index};
 }
 
-ViewState tracksView(const AppState& app, std::string title, std::vector<size_t> indexes) {
-    ViewState view{Screen::Tracks, std::move(title), {}, 0, 0};
-    for (size_t index : indexes)
+ViewState songsView(const AppState& app) {
+    ViewState view{Screen::Songs, "Songs", {}, 0, 0};
+    for (size_t index : app.library.allTrackIndexes())
         view.items.push_back(trackItem(app.library.tracks()[index], index));
     return view;
 }
@@ -23,45 +19,24 @@ void pushView(AppState& app, ViewState next) {
     app.view = std::move(next);
 }
 
-ViewState libraryView(const AppState& app) {
-    ViewState view{Screen::Library,
-                   "Library",
-                   {},
-                   0,
-                   0};
+ViewState homeView(const AppState& app) {
+    ViewState view{Screen::Home, "Home", {}, 0, 0};
     view.items = {
-        {"Songs", countLabel(app.library.tracks().size(), "track", "tracks"),
-         ViewAction::OpenSongs, app.library.allTrackIndexes()},
-        {"Albums", countLabel(app.library.albums().size(), "album", "albums"),
-         ViewAction::OpenAlbums, {}},
-        {"Artists", countLabel(app.library.artists().size(), "artist", "artists"),
-         ViewAction::OpenArtists, {}},
-        {"Playlists", countLabel(app.library.playlists().size(), "playlist", "playlists"),
-         ViewAction::OpenPlaylists, {}},
-        {"Now Playing",
-         app.playback.displayTrackIndex() ? "Open current track" : "Nothing playing",
-         ViewAction::OpenNowPlaying,
-         {}}};
+        {"Songs", std::to_string(app.library.tracks().size()), ViewAction::OpenSongs, std::nullopt},
+        {"Now Playing", "", ViewAction::OpenNowPlaying, std::nullopt},
+        {"Liner Notes", "", ViewAction::OpenLinerNotes, std::nullopt}};
     return view;
 }
 
-void refreshLibraryView(AppState& app) {
+void refreshHomeView(AppState& app) {
     const int selected = app.view.selected;
-    app.view = libraryView(app);
+    app.view = homeView(app);
     app.view.selected = std::clamp(selected, 0, static_cast<int>(app.view.items.size()) - 1);
-}
-
-void showGroups(AppState& app, Screen screen, const std::string& title,
-                const std::vector<TrackGroup>& groups) {
-    ViewState view{screen, title, {}, 0, 0};
-    for (const auto& group : groups)
-        view.items.push_back({group.title, group.subtitle, ViewAction::None, group.trackIndexes});
-    pushView(app, std::move(view));
 }
 }  // namespace
 
-void buildLibraryView(AppState& app) {
-    app.view = libraryView(app);
+void buildHomeView(AppState& app) {
+    app.view = homeView(app);
     app.history.clear();
 }
 
@@ -98,44 +73,27 @@ void selectCurrentItem(AppState& app) {
     const auto& item = app.view.items[selected];
     switch (item.action) {
         case ViewAction::OpenSongs:
-            pushView(app, tracksView(app, "Songs", app.library.allTrackIndexes()));
+            pushView(app, songsView(app));
             return;
-        case ViewAction::OpenAlbums:
-            showGroups(app, Screen::Albums, "Albums", app.library.albums());
-            return;
-        case ViewAction::OpenArtists:
-            showGroups(app, Screen::Artists, "Artists", app.library.artists());
-            return;
-        case ViewAction::OpenPlaylists: {
-            ViewState view{Screen::Playlists, "Playlists", {}, 0, 0};
-            for (const auto& playlist : app.library.playlists())
-                view.items.push_back({playlist.name,
-                                      countLabel(playlist.trackIndexes.size(), "track", "tracks"),
-                                      ViewAction::None, playlist.trackIndexes});
-            pushView(app, std::move(view));
-            return;
-        }
         case ViewAction::OpenNowPlaying:
             openNowPlaying(app);
+            return;
+        case ViewAction::OpenLinerNotes:
+            pushView(app, {Screen::LinerNotes, "Liner Notes", {}, 0, 0});
             return;
         case ViewAction::None:
             break;
     }
-    if (app.view.screen == Screen::Tracks) {
-        std::vector<size_t> queue;
-        queue.reserve(app.view.items.size());
-        for (const auto& row : app.view.items)
-            if (!row.trackIndexes.empty()) queue.push_back(row.trackIndexes.front());
-        playTrack(app, item.trackIndexes.front(), queue, selected);
-    } else {
-        pushView(app, tracksView(app, item.title, item.trackIndexes));
+    if (app.view.screen == Screen::Songs) {
+        if (item.trackIndex)
+            playTrack(app, *item.trackIndex, app.library.allTrackIndexes(), selected);
     }
 }
 
 void navigateBack(AppState& app) {
     if (app.history.empty()) {
-        if (app.view.screen != Screen::Library) {
-            buildLibraryView(app);
+        if (app.view.screen != Screen::Home) {
+            buildHomeView(app);
             return;
         }
         app.running = false;
@@ -143,7 +101,7 @@ void navigateBack(AppState& app) {
     }
     app.view = std::move(app.history.back());
     app.history.pop_back();
-    if (app.view.screen == Screen::Library) refreshLibraryView(app);
+    if (app.view.screen == Screen::Home) refreshHomeView(app);
 }
 
 void advanceWhenFinished(AppState& app) {
@@ -151,7 +109,7 @@ void advanceWhenFinished(AppState& app) {
     const auto& playback = app.playback.snapshot();
     if (playback.phase == PlaybackPhase::Error)
         app.message = playback.errorMessage;
-    else if (playback.phase == PlaybackPhase::Loading ||
-             playback.phase == PlaybackPhase::Playing || playback.phase == PlaybackPhase::Paused)
+    else if (playback.phase == PlaybackPhase::Loading || playback.phase == PlaybackPhase::Playing ||
+             playback.phase == PlaybackPhase::Paused)
         app.message.clear();
 }

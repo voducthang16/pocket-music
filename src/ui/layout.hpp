@@ -25,4 +25,6 @@ constexpr int miniPlayerX = 0;
 constexpr int miniPlayerY = 520;
 constexpr int miniPlayerWidth = width;
 constexpr int miniPlayerHeight = 180;
+constexpr int miniPlayerCoverSize = 152;
+constexpr int miniPlayerCoverY = miniPlayerY + (miniPlayerHeight - miniPlayerCoverSize) / 2;
 }  // namespace layout

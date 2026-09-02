@@ -73,15 +73,17 @@ add_executable(pocket-music
   src/ui/input.cpp
   src/ui/primitives.cpp
   src/ui/renderer.cpp
-  src/ui/renderer_library.cpp
-  src/ui/renderer_list.cpp
+  src/ui/renderer_home.cpp
+  src/ui/renderer_liner_notes.cpp
   src/ui/renderer_now_playing.cpp
   src/ui/renderer_shared.cpp
+  src/ui/renderer_songs.cpp
   src/ui/theme.cpp
   src/ui/vinyl.cpp
 )
 
 target_include_directories(pocket-music PRIVATE src)
+target_compile_definitions(pocket-music PRIVATE POCKET_MUSIC_VERSION="${PROJECT_VERSION}")
 target_compile_options(pocket-music PRIVATE -Wall -Wextra -Wpedantic)
 target_link_libraries(pocket-music PRIVATE
   SDL2::SDL2

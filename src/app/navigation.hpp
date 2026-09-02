@@ -2,7 +2,7 @@
 
 #include "app/app_state.hpp"
 
-void buildLibraryView(AppState& app);
+void buildHomeView(AppState& app);
 ViewState nowPlayingView();
 void openNowPlaying(AppState& app);
 bool playTrack(AppState& app, size_t trackIndex, const std::vector<size_t>& queue,

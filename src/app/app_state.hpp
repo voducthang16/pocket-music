@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -14,26 +15,19 @@
 #include "core/playback_controller.hpp"
 #include "ui/theme.hpp"
 
-enum class Screen { Library, Albums, Artists, Playlists, Tracks, NowPlaying };
-enum class ViewAction {
-    None,
-    OpenSongs,
-    OpenAlbums,
-    OpenArtists,
-    OpenPlaylists,
-    OpenNowPlaying
-};
+enum class Screen { Home, Songs, NowPlaying, LinerNotes };
+enum class ViewAction { None, OpenSongs, OpenNowPlaying, OpenLinerNotes };
 
 struct ViewItem {
     std::string title;
     std::string subtitle;
     ViewAction action = ViewAction::None;
-    std::vector<size_t> trackIndexes;
+    std::optional<size_t> trackIndex;
 };
 
 struct ViewState {
-    Screen screen = Screen::Library;
-    std::string title = "Library";
+    Screen screen = Screen::Home;
+    std::string title = "Home";
     std::vector<ViewItem> items;
     int selected = 0;
     int scroll = 0;

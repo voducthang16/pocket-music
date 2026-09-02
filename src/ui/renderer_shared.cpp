@@ -23,8 +23,8 @@ std::string repeatLabel(const AppState& app) {
 void drawButtonHints(AppState& app) {
     constexpr int y = layout::footerTextY;
     const bool nowPlaying = app.view.screen == Screen::NowPlaying;
-    drawText(app.renderer, app.smallFont, nowPlaying ? "START  PLAY / PAUSE" : "A  SELECT", 128,
-             y, app.theme.text, 230, true);
+    drawText(app.renderer, app.smallFont, nowPlaying ? "START  PLAY / PAUSE" : "A  SELECT", 128, y,
+             app.theme.text, 230, true);
     drawText(app.renderer, app.smallFont, "B  BACK", 384, y, app.theme.textMuted, 220, true);
     drawText(app.renderer, app.smallFont,
              app.playback.shuffle() ? "Y  SHUFFLE ON" : "Y  SHUFFLE OFF", 640, y,
@@ -34,29 +34,54 @@ void drawButtonHints(AppState& app) {
              230, true);
 }
 
-void drawCompactRow(AppState& app, const ViewItem& item, int index, int y, bool active,
-                    int textWidth, const std::string& trailing, bool chevron) {
-    if (active) {
-        SDL_Color selected = app.theme.accentSoft;
-        selected.a = 196;
-        fillRoundedRect(app.renderer,
-                        {layout::contentRowsX, y + 3, layout::contentRowsWidth, 58}, 14,
-                        selected);
-    }
-    const std::string number =
-        index < 9 ? "0" + std::to_string(index + 1) : std::to_string(index + 1);
+namespace {
+int centeredTextY(TTF_Font* font, int rowY) {
+    return rowY + (layout::contentRowHeight - TTF_FontHeight(font)) / 2;
+}
+
+void drawRowSelection(AppState& app, int y, bool active) {
+    if (!active) return;
+    SDL_Color selected = app.theme.accentSoft;
+    selected.a = 196;
+    fillRoundedRect(app.renderer, {layout::contentRowsX, y + 3, layout::contentRowsWidth, 58}, 14,
+                    selected);
+}
+
+std::string rowNumber(int index) {
+    return index < 9 ? "0" + std::to_string(index + 1) : std::to_string(index + 1);
+}
+}  // namespace
+
+void drawHomeRow(AppState& app, const ViewItem& item, int index, int y, bool active,
+                 const std::string& trailing, bool chevron) {
+    drawRowSelection(app, y, active);
+    const int smallY = centeredTextY(app.smallFont, y);
+    drawTextRightAligned(app.renderer, app.smallFont, rowNumber(index), layout::contentRowsX + 48,
+                         smallY, active ? app.theme.accent : app.theme.textMuted);
+    drawText(app.renderer, app.bodyFont, item.title, layout::contentRowsX + 72,
+             centeredTextY(app.bodyFont, y), app.theme.text, 380);
+    constexpr int trailingRight = layout::contentRowsX + layout::contentRowsWidth - 20;
+    if (!trailing.empty())
+        drawTextRightAligned(app.renderer, app.smallFont, trailing, trailingRight, smallY,
+                             app.theme.textMuted);
+    else if (chevron)
+        drawChevron(app.renderer, trailingRight - 9, y + layout::contentRowHeight / 2,
+                    active ? app.theme.accent : app.theme.textMuted);
+}
+
+void drawTrackRow(AppState& app, const ViewItem& item, int index, int y, bool active,
+                  const std::string& duration) {
+    drawRowSelection(app, y, active);
+    const std::string number = rowNumber(index);
     drawText(app.renderer, app.smallFont, number, layout::contentRowsX + 16, y + 18,
              active ? app.theme.accent : app.theme.textMuted, 52);
     drawText(app.renderer, app.bodyFont, item.title, layout::contentRowsX + 72, y + 1,
-             app.theme.text, textWidth);
+             app.theme.text, 316);
     drawText(app.renderer, app.smallFont, item.subtitle, layout::contentRowsX + 72, y + 36,
-             app.theme.textMuted, textWidth);
-    if (!trailing.empty())
-        drawText(app.renderer, app.smallFont, trailing, layout::contentRowsX + 492, y + 18,
-                 app.theme.textMuted, 52);
-    else if (chevron)
-        drawChevron(app.renderer, layout::contentRowsX + 524, y + 31,
-                    active ? app.theme.accent : app.theme.textMuted);
+             app.theme.textMuted, 316);
+    drawTextRightAligned(app.renderer, app.smallFont, duration,
+                         layout::contentRowsX + layout::contentRowsWidth - 20, y + 18,
+                         app.theme.textMuted);
 }
 
 const Track* currentTrack(const AppState& app) {
@@ -76,18 +101,17 @@ void drawPlaybackSurface(AppState& app) {
 void drawPlaybackProgress(AppState& app, const PlaybackSnapshot& playback, int fallbackDuration,
                           const SDL_Rect& bar, int labelsY) {
     const int elapsed = std::max(0, static_cast<int>(playback.positionSeconds));
-    const int duration =
-        playback.durationSeconds > 0 ? static_cast<int>(playback.durationSeconds) : fallbackDuration;
+    const int duration = playback.durationSeconds > 0 ? static_cast<int>(playback.durationSeconds)
+                                                      : fallbackDuration;
     const int boundedElapsed = duration > 0 ? std::min(elapsed, duration) : 0;
-    const int filled = duration > 0 ? static_cast<int>(static_cast<double>(bar.w) * boundedElapsed /
-                                                       duration)
-                                    : 0;
+    const int filled =
+        duration > 0 ? static_cast<int>(static_cast<double>(bar.w) * boundedElapsed / duration) : 0;
     fillRoundedRect(app.renderer, bar, 2, app.theme.surfaceRaised);
     fillRoundedRect(app.renderer, {bar.x, bar.y, filled, bar.h}, 2, app.theme.accent);
     drawText(app.renderer, app.smallFont, formatDuration(elapsed), bar.x, labelsY,
              app.theme.textMuted);
-    drawText(app.renderer, app.smallFont, formatDuration(std::max(0, duration)),
-             bar.x + bar.w - 62, labelsY, app.theme.textMuted, 62);
+    drawText(app.renderer, app.smallFont, formatDuration(std::max(0, duration)), bar.x + bar.w - 62,
+             labelsY, app.theme.textMuted, 62);
 }
 
 void drawNowPlayingBand(AppState& app) {
@@ -95,7 +119,9 @@ void drawNowPlayingBand(AppState& app) {
     constexpr int y = layout::miniPlayerY;
     drawPlaybackSurface(app);
     const Track* track = currentTrack(app);
-    drawCover(app, track, {x + 48, y + 24, 152, 152});
+    drawCover(app, track,
+              {x + 48, layout::miniPlayerCoverY, layout::miniPlayerCoverSize,
+               layout::miniPlayerCoverSize});
     drawText(app.renderer, app.bodyFont, track ? track->title : "Ready when you are", x + 232,
              y + 23, app.theme.text, 540);
     drawText(app.renderer, app.smallFont, track ? track->artist : "Choose a song to begin", x + 232,
@@ -108,8 +134,8 @@ void drawNowPlayingBand(AppState& app) {
                          {progressX, y + 120, progressWidth, 5}, y + 139);
     if (track)
         drawText(app.renderer, app.smallFont,
-                 playback.phase == PlaybackPhase::Paused ? "PAUSED" : "PLAYING", x + 820,
-                 y + 67, app.theme.accent, 112);
+                 playback.phase == PlaybackPhase::Paused ? "PAUSED" : "PLAYING", x + 820, y + 67,
+                 app.theme.accent, 112);
 }
 
 SDL_Texture* albumCover(AppState& app, const Track& track) {

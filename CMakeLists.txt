@@ -74,6 +74,10 @@ add_executable(pocket-music
   src/ui/input.cpp
   src/ui/primitives.cpp
   src/ui/renderer.cpp
+  src/ui/renderer_library.cpp
+  src/ui/renderer_list.cpp
+  src/ui/renderer_now_playing.cpp
+  src/ui/renderer_shared.cpp
   src/ui/theme.cpp
 )
 
@@ -102,6 +106,7 @@ if(BUILD_TESTING)
   add_executable(pocket-music-tests
     tests/test_main.cpp
     tests/test_library.cpp
+    tests/test_layout.cpp
     tests/test_navigation.cpp
     tests/test_preferences.cpp
     tests/test_playback.cpp

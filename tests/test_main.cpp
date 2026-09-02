@@ -5,6 +5,7 @@
 int main() {
     TestCases tests;
     addLibraryTests(tests);
+    addLayoutTests(tests);
     addStateTests(tests);
     addPlaybackTests(tests);
     addPreferencesTests(tests);

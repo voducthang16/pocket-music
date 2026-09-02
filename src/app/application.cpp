@@ -43,14 +43,14 @@ bool initializeUi(AppState& app, bool fullscreen) {
     const Uint32 windowFlags = SDL_WINDOW_ALLOW_HIGHDPI |
                                (fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : SDL_WINDOW_RESIZABLE);
     app.window = SDL_CreateWindow("Pocket Music", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                                  384, 512, windowFlags);
+                                  1024, 768, windowFlags);
     app.renderer =
         SDL_CreateRenderer(app.window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     if (app.renderer) SDL_RenderSetLogicalSize(app.renderer, layout::width, layout::height);
     const auto font = fontPath();
-    app.titleFont = TTF_OpenFont(font.c_str(), 42);
-    app.bodyFont = TTF_OpenFont(font.c_str(), 38);
-    app.smallFont = TTF_OpenFont(font.c_str(), 26);
+    app.titleFont = TTF_OpenFont(font.c_str(), 36);
+    app.bodyFont = TTF_OpenFont(font.c_str(), 30);
+    app.smallFont = TTF_OpenFont(font.c_str(), 22);
     if (!app.window || !app.renderer || !app.titleFont || !app.bodyFont || !app.smallFont) {
         std::cerr << "Could not create UI: " << SDL_GetError() << ' ' << TTF_GetError() << '\n';
         return false;

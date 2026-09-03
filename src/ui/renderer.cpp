@@ -44,7 +44,7 @@ void drawUpdateCheckModal(AppState& app, Uint64 now) {
              app.theme.text, card.w - 64, true);
     drawText(app.renderer, app.smallFont, app.updateCheck.detail, centerX, card.y + 139,
              app.theme.accent, card.w - 64, true);
-    drawText(app.renderer, app.smallFont, "Please keep Pocket Music open", centerX, card.y + 172,
+    drawText(app.renderer, app.smallFont, "B / Back to cancel", centerX, card.y + 172,
              app.theme.textMuted, card.w - 64, true);
 }
 

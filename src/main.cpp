@@ -12,7 +12,10 @@ int main(int argc, char** argv) {
     bool smoke = false, fullscreen = false;
     for (int i = 1; i < argc; ++i) {
         const std::string argument = argv[i];
-        if (argument == "--smoke-test")
+        if (argument == "--version") {
+            std::cout << POCKET_MUSIC_VERSION << '\n';
+            return 0;
+        } else if (argument == "--smoke-test")
             smoke = true;
         else if (argument == "--fullscreen")
             fullscreen = true;

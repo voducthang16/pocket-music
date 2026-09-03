@@ -1,7 +1,6 @@
 #include "ui/input.hpp"
 
 #include "app/navigation.hpp"
-#include "ui/layout.hpp"
 void handleKey(AppState& app, SDL_Keycode code) {
     if (app.update.modalVisible()) {
         if (app.update.cancellable() && (code == SDLK_ESCAPE || code == SDLK_b))

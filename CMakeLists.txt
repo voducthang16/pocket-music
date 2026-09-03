@@ -40,7 +40,12 @@ if(NOT TARGET SDL2_image::SDL2_image)
   )
 endif()
 
-find_package(TagLib CONFIG REQUIRED)
+find_package(TagLib CONFIG QUIET)
+if(NOT TARGET TagLib::tag)
+  find_package(PkgConfig REQUIRED)
+  pkg_check_modules(TAGLIB REQUIRED IMPORTED_TARGET taglib)
+  add_library(TagLib::tag ALIAS PkgConfig::TAGLIB)
+endif()
 find_package(Threads REQUIRED)
 
 find_path(FFMPEG_INCLUDE_DIR libavformat/avformat.h

@@ -18,8 +18,10 @@ an external media-player process.
 - Preserve playback history and apply the three-second Previous behavior
 - Restore queue, shuffle order, history, repeat mode, and position in a paused state
 - Handle loading, finished, empty-library, and recoverable playback-error states
-- Open Songs, Now Playing, and the music-themed Liner Notes app information from Home
+- Open Songs, Now Playing, and About from Home
 - Return from a restored Now Playing session to Home before exiting the app
+- Check, download, and verify remote updates without blocking or closing the UI
+- Hand verified updates to the launcher for transactional installation and restart
 - Navigate with a keyboard or SDL game controller
 - Use a pastel vintage stationery art direction: warm ivory paper, blush watercolor, pressed
   flowers, soft cocoa details, and a small Hello Kitty cassette vignette kept outside the UI-safe
@@ -100,8 +102,9 @@ Music/
       01 - Song.mp3
 ```
 
-Folder names do not define navigation groups. Pocket Music recursively adds supported audio files
-to Songs and uses file metadata only for track details.
+Folder names do not currently define navigation groups. Pocket Music adds supported audio files to
+Songs recursively. Title and artist prefer file metadata. Album prefers file metadata and falls
+back to the audio file's parent directory name when the album tag is empty.
 
 ## TrimUI Stock OS package
 
@@ -115,37 +118,58 @@ The package is written to `build/trimui/PocketMusic/`. Copy that `PocketMusic` d
 `Apps/` on the Stock OS SD card. The launcher:
 
 - reads music from `/mnt/SDCARD/Music`
-- stores playback state in `Apps/PocketMusic/data`
+- stores playback state and updater data in `Apps/PocketMusic/data`
 - writes runtime output to `/mnt/SDCARD/pocket-music.log`
 - uses SDL libraries supplied by Stock OS
-- handles verified remote update checks and transactional installs after the app exits
+- recovers interrupted installs before launching the app
+- applies verified updates after Pocket Music performs the install handoff
 
 The package cross-compiles as AArch64 C++17 and statically links the pinned FFmpeg and TagLib
-builds. It also includes a CA certificate bundle for HTTPS downloads because TrimUI Stock OS may
-not provide one. The macOS build uses C++20. Invalid playback state falls back safely to defaults.
+builds. It also includes a CA certificate bundle for verified HTTPS downloads because TrimUI Stock
+OS may not provide one. The macOS build currently uses C++20. Invalid playback state falls back
+safely to defaults.
 
-Pushing a tag matching the CMake project version, such as `v0.2.2`, publishes the full install ZIP,
-a verified update archive, and update metadata to GitHub Releases.
+Pushing a tag that matches the CMake project version publishes a full install ZIP, a verified OTA
+archive, and update metadata to GitHub Releases. For example, a project version `0.2.6` must be
+tagged `v0.2.6`.
 
 ### Remote updates
 
-From Home, select `Check for Update`. Pocket Music exits before performing network work, downloads
-the latest release metadata and archive over verified HTTPS, then checks the archive size and
-SHA-256 checksum. If a newer version is ready, Home shows `Install Update` with its version. The
-install preserves `Apps/PocketMusic/data`, replaces the application transactionally, and restores
-the previous installation if an interrupted update is detected.
+Select `Check for Updates` from Home. Pocket Music stays open while the update checker runs in the
+background. The modal reflects the real preparation phases:
 
-Installations from before `v0.2.2` may need one manual reinstall or SSH bootstrap because those
-packages did not include the CA bundle required by some Stock OS images. Once `v0.2.2` or newer is
-installed, the CA bundle and updater are carried forward by subsequent update archives.
+```text
+Checking for Updates
+        ↓
+Downloading vX.Y.Z...
+        ↓
+Verifying update...
+```
+
+The checker downloads release metadata and the OTA archive over verified HTTPS, validates the
+reported archive size and SHA-256 checksum, and only then exposes `Install Update` on Home. The
+pending version is shown beside the install action. The check can be cancelled with B while the
+network/check process is active.
+
+Selecting `Install Update` first presents the install handoff modal. Pocket Music renders that
+state before exiting; the launcher then owns the filesystem transaction. Installation preserves
+`Apps/PocketMusic/data`, backs up the managed application files, replaces them transactionally, and
+can restore the previous installation after a failed or interrupted update. The launcher restarts
+Pocket Music after the transaction and the app displays the resulting update status.
+
+The check path runs inside the application process lifecycle; the launcher no longer performs a
+second legacy update check after Pocket Music exits. The launcher remains responsible for install
+handoff and interrupted-update recovery.
 
 Runtime artwork is limited to `background-hello-kitty-v6.png`, `fallback-vinyl.png`, `icon.png`,
 and the bundled Noto Sans font. `app-icon-source.png` is retained as the editable source for future
 icon exports.
 
-Native FFmpeg/SDL playback, Home/Songs navigation, controller input, paused session restore, and an
-HTTPS OTA update from `v0.2.0` to `v0.2.2` have been exercised on the TrimUI Brick Hammer.
-Suspend/resume behavior and every Stock OS firmware revision are not covered by automated tests.
+Native FFmpeg/SDL playback, Home/Songs/Now Playing navigation, controller input, paused session
+restore, transactional OTA installation, in-app update loading phases, and the deferred install
+handoff have been exercised on a TrimUI Brick Hammer. The current update UX was verified with a
+real OTA from v0.2.5 to v0.2.6 without manually copying the application over SSH. Suspend/resume
+behavior and every Stock OS firmware revision are not covered by automated tests.
 
 ## Verification
 
@@ -156,12 +180,13 @@ make test
 CTest runs:
 
 - unit tests for scanning, navigation, input mapping, queue policies, persistence,
-  theme/layout primitives, and playback lifecycle
+  theme/layout/presentation primitives, and playback lifecycle
 - a smoke scan against a generated empty music directory
 - an FFmpeg/SDL integration test with a generated WAV and SDL's dummy audio driver
 
 Verify the target build separately with `make trimui-package`. Physical display, controls,
-speakers, and SD-card behavior still require a final check on the handheld.
+speakers, and SD-card behavior still require a final check on the handheld after TrimUI-sensitive
+changes.
 
 ## License
 

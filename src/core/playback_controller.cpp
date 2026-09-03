@@ -47,8 +47,8 @@ bool PlaybackController::requestLoad(size_t trackIndex, double resumeSeconds, bo
         ++revision_;
         return false;
     }
-    pendingLoad_ = PendingLoad{generation,  trackIndex, std::max(0.0, resumeSeconds),
-                               startPaused, false,      0, origin};
+    pendingLoad_ = PendingLoad{
+        generation, trackIndex, std::max(0.0, resumeSeconds), startPaused, false, 0, origin};
     failedLoad_.reset();
     if (origin != LoadOrigin::Automatic) automaticFailures_ = 0;
     snapshot_.phase = PlaybackPhase::Loading;
@@ -115,9 +115,7 @@ void PlaybackController::handle(const PlayerEvent& event) {
             advanceAfterEnd();
             break;
         case PlayerEventType::Failed:
-        case PlayerEventType::Disconnected:
-            if (event.type == PlayerEventType::Failed && pendingLoad_ &&
-                pendingLoad_->origin == LoadOrigin::Automatic &&
+            if (pendingLoad_ && pendingLoad_->origin == LoadOrigin::Automatic &&
                 ++automaticFailures_ < queue_.source().size()) {
                 if (const auto nextTrack = queue_.next(cyclesQueue())) {
                     requestLoad(*nextTrack, 0, false, LoadOrigin::Automatic);

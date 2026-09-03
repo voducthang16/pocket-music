@@ -10,15 +10,15 @@ void drawDetail(AppState& app, const std::string& label, const std::string& valu
 }
 }  // namespace
 
-void drawLinerNotesScreen(AppState& app) {
-    drawText(app.renderer, app.titleFont, "Liner Notes", layout::headingX, layout::headingTitleY,
+void drawAboutScreen(AppState& app) {
+    drawText(app.renderer, app.titleFont, "About", layout::headingX, layout::headingTitleY,
              app.theme.text, 400);
     drawText(app.renderer, app.smallFont, "POCKET MUSIC", layout::headingX,
              layout::headingSubtitleY, app.theme.accent, 360);
     drawDetail(app, "VERSION", POCKET_MUSIC_VERSION, 158);
     drawDetail(app, "BY", "voducthang16", 210);
     drawDetail(app, "SOURCE", "github.com/voducthang16/pocket-music", 262);
-    drawDetail(app, "MUSIC", "/mnt/SDCARD/Music", 314);
+    drawDetail(app, "MUSIC", app.library.root().string(), 314);
     drawDetail(app, "FORMATS", "MP3 · FLAC · WAV · OGG", 366);
     drawNowPlayingBand(app);
 }

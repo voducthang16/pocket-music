@@ -1,15 +1,15 @@
 #include "app/navigation.hpp"
 
-#include <algorithm>
-#include <cerrno>
-#include <cstdlib>
 #include <fcntl.h>
-#include <fstream>
 #include <signal.h>
-#include <string>
-#include <system_error>
 #include <sys/wait.h>
 #include <unistd.h>
+
+#include <algorithm>
+#include <cstdlib>
+#include <fstream>
+#include <string>
+#include <system_error>
 
 namespace {
 ViewItem trackItem(const Track& track, size_t index) {
@@ -106,7 +106,7 @@ ViewState homeView(const AppState& app) {
     view.items = {
         {"Songs", std::to_string(app.library.tracks().size()), ViewAction::OpenSongs, std::nullopt},
         {"Now Playing", "", ViewAction::OpenNowPlaying, std::nullopt},
-        {"Liner Notes", "", ViewAction::OpenLinerNotes, std::nullopt},
+        {"About", "", ViewAction::OpenAbout, std::nullopt},
         {"Check for Updates", "", ViewAction::CheckForUpdates, std::nullopt}};
     if (const auto version = pendingUpdateVersion())
         view.items.push_back(
@@ -141,14 +141,15 @@ void readCheckPhase(AppState& app) {
     if (!version.empty()) app.update.version = version;
     if (phase == "downloading") {
         app.update.phase = UpdatePhase::Downloading;
-        app.update.detail = app.update.version.empty() ? "Downloading update..."
-                                                       : "Downloading v" + app.update.version + "...";
+        app.update.detail = app.update.version.empty()
+                                ? "Downloading update..."
+                                : "Downloading v" + app.update.version + "...";
     } else if (phase == "verifying") {
         app.update.phase = UpdatePhase::Verifying;
         app.update.detail = "Verifying update...";
     } else if (phase == "checking") {
         app.update.phase = UpdatePhase::Checking;
-        app.update.detail = "Looking for a new version...";
+        app.update.detail = "Looking for updates...";
     }
 }
 
@@ -238,7 +239,7 @@ bool requestUpdateCheck(AppState& app) {
     app.update.phase = UpdatePhase::Checking;
     app.update.processId = static_cast<int>(pid);
     app.update.version.clear();
-    app.update.detail = "Looking for a new version...";
+    app.update.detail = "Looking for updates...";
     return true;
 }
 
@@ -270,11 +271,12 @@ void pollUpdateCheck(AppState& app) {
     } else if (exitCode == 10) {
         app.update.phase = UpdatePhase::Ready;
         if (const auto version = pendingUpdateVersion()) app.update.version = *version;
-        app.update.detail = app.update.version.empty() ? "Update is ready to install"
-                                                       : "v" + app.update.version + " is ready to install";
+        app.update.detail = app.update.version.empty()
+                                ? "Update is ready to install"
+                                : "v" + app.update.version + " is ready to install";
     } else {
         app.update.phase = UpdatePhase::Error;
-        app.update.detail = "Couldn't check for updates. Check your Wi-Fi and try again.";
+        app.update.detail = "Couldn't check for updates. Check Wi-Fi and try again.";
     }
     refreshHomeView(app);
 }
@@ -334,8 +336,8 @@ void selectCurrentItem(AppState& app) {
         case ViewAction::OpenNowPlaying:
             openNowPlaying(app);
             return;
-        case ViewAction::OpenLinerNotes:
-            pushView(app, {Screen::LinerNotes, "Liner Notes", {}, 0, 0});
+        case ViewAction::OpenAbout:
+            pushView(app, {Screen::About, "About", {}, 0, 0});
             return;
         case ViewAction::CheckForUpdates:
             requestUpdateCheck(app);

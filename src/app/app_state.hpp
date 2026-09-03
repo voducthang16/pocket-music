@@ -15,12 +15,12 @@
 #include "core/playback_controller.hpp"
 #include "ui/theme.hpp"
 
-enum class Screen { Home, Songs, NowPlaying, LinerNotes };
+enum class Screen { Home, Songs, NowPlaying, About };
 enum class ViewAction {
     None,
     OpenSongs,
     OpenNowPlaying,
-    OpenLinerNotes,
+    OpenAbout,
     CheckForUpdates,
     InstallUpdate
 };

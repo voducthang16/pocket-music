@@ -3,8 +3,10 @@
 #include <algorithm>
 #include <iomanip>
 #include <sstream>
+#include <string>
 
 #include "ui/layout.hpp"
+#include "ui/presentation.hpp"
 #include "ui/primitives.hpp"
 #include "ui/renderer_internal.hpp"
 
@@ -28,8 +30,15 @@ void drawButtonHints(AppState& app) {
         return;
     }
     const bool nowPlaying = app.view.screen == Screen::NowPlaying;
-    drawText(app.renderer, app.smallFont, nowPlaying ? "START  PLAY / PAUSE" : "A  SELECT", 128, y,
-             app.theme.text, 230, true);
+    if (nowPlaying) {
+        const auto presentation = playbackPresentation(app.playback.snapshot().phase);
+        const std::string startHint = presentation.primaryAction.empty()
+                                          ? ""
+                                          : "START  " + std::string(presentation.primaryAction);
+        drawText(app.renderer, app.smallFont, startHint, 128, y, app.theme.text, 230, true);
+    } else {
+        drawText(app.renderer, app.smallFont, "A  SELECT", 128, y, app.theme.text, 230, true);
+    }
     drawText(app.renderer, app.smallFont, "B  BACK", 384, y, app.theme.textMuted, 220, true);
     drawText(app.renderer, app.smallFont,
              app.playback.shuffle() ? "Y  SHUFFLE ON" : "Y  SHUFFLE OFF", 640, y,
@@ -48,8 +57,7 @@ void drawExitConfirmation(AppState& app) {
     fillRoundedRect(app.renderer, frame, 22, app.theme.accentSoft);
     SDL_Color panel = app.theme.surface;
     panel.a = 250;
-    fillRoundedRect(app.renderer, {frame.x + 3, frame.y + 3, frame.w - 6, frame.h - 6}, 20,
-                    panel);
+    fillRoundedRect(app.renderer, {frame.x + 3, frame.y + 3, frame.w - 6, frame.h - 6}, 20, panel);
 
     drawText(app.renderer, app.titleFont, "Leave Pocket Music?", layout::width / 2, frame.y + 42,
              app.theme.text, 520, true);
@@ -88,8 +96,7 @@ std::string rowNumber(int index) {
 }
 }  // namespace
 
-void drawHomeRow(AppState& app, const ViewItem& item, int index, int y, bool active,
-                 const std::string& trailing, bool chevron) {
+void drawHomeRow(AppState& app, const ViewItem& item, int index, int y, bool active, bool chevron) {
     drawRowSelection(app, y, active);
     const int smallY = centeredTextY(app.smallFont, y);
     drawTextRightAligned(app.renderer, app.smallFont, rowNumber(index), layout::contentRowsX + 48,
@@ -97,8 +104,8 @@ void drawHomeRow(AppState& app, const ViewItem& item, int index, int y, bool act
     drawText(app.renderer, app.bodyFont, item.title, layout::contentRowsX + 72,
              centeredTextY(app.bodyFont, y), app.theme.text, 380);
     constexpr int trailingRight = layout::contentRowsX + layout::contentRowsWidth - 20;
-    if (!trailing.empty())
-        drawTextRightAligned(app.renderer, app.smallFont, trailing, trailingRight, smallY,
+    if (!item.subtitle.empty())
+        drawTextRightAligned(app.renderer, app.smallFont, item.subtitle, trailingRight, smallY,
                              app.theme.textMuted);
     else if (chevron)
         drawChevron(app.renderer, trailingRight - 9, y + layout::contentRowHeight / 2,
@@ -168,10 +175,12 @@ void drawNowPlayingBand(AppState& app) {
     constexpr int progressWidth = 700;
     drawPlaybackProgress(app, playback, track ? track->durationSeconds : 0,
                          {progressX, y + 120, progressWidth, 5}, y + 139);
-    if (track)
-        drawText(app.renderer, app.smallFont,
-                 playback.phase == PlaybackPhase::Paused ? "PAUSED" : "PLAYING", x + 820, y + 67,
-                 app.theme.accent, 112);
+    if (track) {
+        const auto presentation = playbackPresentation(playback.phase);
+        drawText(app.renderer, app.smallFont, std::string(presentation.status), x + 820, y + 67,
+                 playback.phase == PlaybackPhase::Error ? app.theme.accent : app.theme.textMuted,
+                 112);
+    }
 }
 
 SDL_Texture* albumCover(AppState& app, const Track& track) {

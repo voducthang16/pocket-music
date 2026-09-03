@@ -47,9 +47,8 @@ void drawUpdateModal(AppState& app, Uint64 now) {
              true);
     drawText(app.renderer, app.smallFont, app.update.detail, centerX, card.y + 139,
              app.theme.accent, card.w - 64, true);
-    drawText(app.renderer, app.smallFont,
-             installing ? "Please don't power off" : "B / Back to cancel", centerX,
-             card.y + 172, app.theme.textMuted, card.w - 64, true);
+    drawText(app.renderer, app.smallFont, installing ? "Please don't power off" : "B  Cancel",
+             centerX, card.y + 172, app.theme.textMuted, card.w - 64, true);
 }
 
 std::string updateResultMessage(const AppState& app) {
@@ -73,14 +72,15 @@ void renderApp(AppState& app) {
         drawHomeScreen(app);
     else if (app.view.screen == Screen::NowPlaying)
         drawNowPlayingScreen(app);
-    else if (app.view.screen == Screen::LinerNotes)
-        drawLinerNotesScreen(app);
+    else if (app.view.screen == Screen::About)
+        drawAboutScreen(app);
     else
         drawSongsScreen(app);
 
     const std::string updateMessage = updateResultMessage(app);
     const std::string& bannerMessage = updateMessage.empty() ? app.message : updateMessage;
-    if (!bannerMessage.empty() && app.view.screen != Screen::NowPlaying && !app.update.modalVisible()) {
+    if (!bannerMessage.empty() && app.view.screen != Screen::NowPlaying &&
+        !app.update.modalVisible()) {
         const SDL_Rect banner{layout::messageBannerX, layout::messageBannerY,
                               layout::messageBannerWidth, layout::messageBannerHeight};
         SDL_Color surface = app.theme.surfaceRaised;

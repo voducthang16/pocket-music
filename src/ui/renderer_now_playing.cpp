@@ -1,6 +1,8 @@
 #include <algorithm>
+#include <string>
 
 #include "ui/layout.hpp"
+#include "ui/presentation.hpp"
 #include "ui/primitives.hpp"
 #include "ui/renderer_internal.hpp"
 
@@ -9,33 +11,29 @@ void drawTransport(AppState& app, const Track* track) {
     constexpr int y = layout::miniPlayerY;
     drawPlaybackSurface(app);
     if (!track) {
-        drawText(app.renderer, app.bodyFont, "Choose a song from Home", layout::width / 2, y + 66,
-                 app.theme.text, 420, true);
+        drawText(app.renderer, app.bodyFont, "Go to Songs to start listening", layout::width / 2,
+                 y + 66, app.theme.text, 420, true);
         return;
     }
 
     const auto playback = app.playback.snapshot();
+    const auto presentation = playbackPresentation(playback.phase);
     constexpr int progressX = 80;
     constexpr int progressWidth = 864;
     drawPlaybackProgress(app, playback, track->durationSeconds,
                          {progressX, y + 28, progressWidth, 5}, y + 43);
 
-    const bool paused = playback.phase == PlaybackPhase::Paused;
     drawText(app.renderer, app.smallFont, "L1  PREVIOUS", 252, y + 105, app.theme.textMuted, 180,
              true);
-    drawPlayState(app.renderer, 501, y + 91, !paused, app.theme.accent);
-    drawText(app.renderer, app.smallFont, paused ? "PLAY" : "PAUSE", 512, y + 129, app.theme.text,
-             100, true);
+    if (!presentation.primaryAction.empty()) {
+        drawPlayState(app.renderer, 501, y + 91, presentation.showPauseIcon, app.theme.accent);
+        drawText(app.renderer, app.smallFont, std::string(presentation.primaryAction), 512, y + 129,
+                 app.theme.text, 100, true);
+    }
     drawText(app.renderer, app.smallFont, "R1  NEXT", 772, y + 105, app.theme.textMuted, 180, true);
-
-    std::string status;
-    if (playback.phase == PlaybackPhase::Loading) status = "LOADING";
-    if (playback.phase == PlaybackPhase::Error) status = "START  RETRY  ·  R1  NEXT";
-    if (playback.phase == PlaybackPhase::Finished) status = "QUEUE FINISHED";
-    if (!status.empty())
-        drawText(app.renderer, app.smallFont, status, layout::width / 2, y + 62,
-                 playback.phase == PlaybackPhase::Error ? app.theme.accent : app.theme.textMuted,
-                 360, true);
+    drawText(
+        app.renderer, app.smallFont, std::string(presentation.status), layout::width / 2, y + 62,
+        playback.phase == PlaybackPhase::Error ? app.theme.accent : app.theme.textMuted, 360, true);
 }
 }  // namespace
 
@@ -46,7 +44,7 @@ void drawNowPlayingScreen(AppState& app) {
     if (!index || *index >= app.library.tracks().size()) {
         drawText(app.renderer, app.titleFont, "Nothing playing", layout::nowPlayingMetadataX, 84,
                  app.theme.text, layout::nowPlayingTitleWidth);
-        drawText(app.renderer, app.bodyFont, "Return to Songs and choose a track",
+        drawText(app.renderer, app.bodyFont, "Go to Songs to choose a track",
                  layout::nowPlayingMetadataX, 142, app.theme.textMuted,
                  layout::nowPlayingMetadataWidth);
         drawCover(app, nullptr,

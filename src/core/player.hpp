@@ -13,7 +13,6 @@ enum class PlayerEventType {
     SeekableChanged,
     Ended,
     Failed,
-    Disconnected,
 };
 
 struct PlayerEvent {

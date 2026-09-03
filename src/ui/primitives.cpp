@@ -85,8 +85,8 @@ void drawTextRightAligned(SDL_Renderer* r, TTF_Font* f, const std::string& value
 }
 void drawMarqueeText(SDL_Renderer* r, TTF_Font* f, const std::string& value, const SDL_Rect& bounds,
                      SDL_Color c, Uint64 clock) {
-    int width = 0, height = 0;
-    if (TTF_SizeUTF8(f, value.c_str(), &width, &height) != 0) return;
+    int width = 0;
+    if (TTF_SizeUTF8(f, value.c_str(), &width, nullptr) != 0) return;
     if (width <= bounds.w) {
         drawText(r, f, value, bounds.x, bounds.y, c);
         return;

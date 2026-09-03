@@ -13,11 +13,16 @@ void stateValidation() {
     expected.orderPaths = {expected.currentTrackPath, "Music/One.mp3"};
     expected.historyPaths = {"Music/One.mp3"};
     expected.positionSeconds = 137.5;
-    expected.paused = false;
     expected.shuffle = true;
     expected.repeatMode = 2;
     expected.screen = "now-playing";
     require(saveSession(path, expected), "atomic session write must succeed");
+
+    std::ifstream persisted(path);
+    std::string line;
+    while (std::getline(persisted, line))
+        require(line.rfind("paused ", 0) != 0, "paused state must not be persisted");
+
     const auto actual = loadSession(path);
     require(actual.currentTrackPath == expected.currentTrackPath, "Unicode path must round-trip");
     require(actual.sourcePaths == expected.sourcePaths &&
@@ -26,7 +31,6 @@ void stateValidation() {
             "queue paths and history must round-trip");
     require(actual.positionSeconds == 137.5 && actual.repeatMode == 2,
             "playback state must round-trip");
-    require(actual.paused, "restored sessions must always start paused");
     std::ofstream(path) << "position -40\nrepeat 99\nscreen \"removed-screen\"\n";
     const auto invalid = loadSession(path);
     require(invalid.positionSeconds == 0, "negative position must be rejected");

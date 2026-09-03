@@ -12,7 +12,6 @@ struct PlaybackSession {
     std::vector<std::string> historyPaths;
     size_t cursor = 0;
     double positionSeconds = 0;
-    bool paused = true;
     bool shuffle = false;
     int repeatMode = 0;
     std::string screen = "home";

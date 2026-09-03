@@ -102,16 +102,13 @@ void handleInputAction(AppState& app, InputAction action) {
         }
         return;
     }
-    const auto& items = app.view.items;
+    const int itemCount = static_cast<int>(app.view.itemCount());
     switch (action) {
         case InputAction::Up:
-            if (!items.empty())
-                app.view.selected = (app.view.selected - 1 + static_cast<int>(items.size())) %
-                                    static_cast<int>(items.size());
+            if (itemCount > 0) app.view.selected = (app.view.selected - 1 + itemCount) % itemCount;
             break;
         case InputAction::Down:
-            if (!items.empty())
-                app.view.selected = (app.view.selected + 1) % static_cast<int>(items.size());
+            if (itemCount > 0) app.view.selected = (app.view.selected + 1) % itemCount;
             break;
         case InputAction::Confirm:
             selectCurrentItem(app);

@@ -1,17 +1,18 @@
 #include "app/navigation.hpp"
 
 #include <algorithm>
+#include <numeric>
 
 namespace {
-ViewItem trackItem(const Track& track, size_t index) {
-    return {track.title, track.artist, ViewAction::None, index};
+std::vector<size_t> trackIndexSequence(size_t count) {
+    std::vector<size_t> indexes(count);
+    std::iota(indexes.begin(), indexes.end(), 0);
+    return indexes;
 }
 
 ViewState songsView(const AppState& app) {
-    ViewState view{Screen::Songs, "Songs", {}, 0, 0};
-    for (size_t index : app.library.allTrackIndexes())
-        view.items.push_back(trackItem(app.library.tracks()[index], index));
-    return view;
+    return {Screen::Songs, "Songs", TrackListView{trackIndexSequence(app.library.tracks().size())},
+            0, 0};
 }
 
 void pushView(AppState& app, ViewState next) {
@@ -20,16 +21,15 @@ void pushView(AppState& app, ViewState next) {
 }
 
 ViewState homeView(const AppState& app) {
-    ViewState view{Screen::Home, "Home", {}, 0, 0};
-    view.items = {
-        {"Songs", std::to_string(app.library.tracks().size()), ViewAction::OpenSongs, std::nullopt},
-        {"Now Playing", "", ViewAction::OpenNowPlaying, std::nullopt},
-        {"About", "", ViewAction::OpenAbout, std::nullopt},
-        {"Check for Updates", "", ViewAction::CheckForUpdates, std::nullopt}};
+    MenuView menu{{
+        {"Songs", std::to_string(app.library.tracks().size()), NavigationIntent::OpenSongs},
+        {"Now Playing", "", NavigationIntent::OpenNowPlaying},
+        {"About", "", NavigationIntent::OpenAbout},
+        {"Check for Updates", "", NavigationIntent::CheckForUpdates},
+    }};
     if (const auto version = app.updates.pendingVersion())
-        view.items.push_back(
-            {"Install Update", "v" + *version, ViewAction::InstallUpdate, std::nullopt});
-    return view;
+        menu.items.push_back({"Install Update", "v" + *version, NavigationIntent::InstallUpdate});
+    return {Screen::Home, "Home", std::move(menu), 0, 0};
 }
 }  // namespace
 
@@ -42,10 +42,10 @@ void refreshHomeView(AppState& app) {
     if (app.view.screen != Screen::Home) return;
     const int selected = app.view.selected;
     app.view = homeView(app);
-    app.view.selected = std::clamp(selected, 0, static_cast<int>(app.view.items.size()) - 1);
+    app.view.selected = std::clamp(selected, 0, static_cast<int>(app.view.itemCount()) - 1);
 }
 
-ViewState nowPlayingView() { return {Screen::NowPlaying, "Now Playing", {}, 0, 0}; }
+ViewState nowPlayingView() { return {Screen::NowPlaying, "Now Playing", std::monostate{}, 0, 0}; }
 
 void openNowPlaying(AppState& app) {
     if (app.view.screen == Screen::NowPlaying || !app.playback.displayTrackIndex()) return;
@@ -75,35 +75,34 @@ void finishDeferredUpdateHandoff(AppState& app) {
 }
 
 void selectCurrentItem(AppState& app) {
-    if (app.view.screen == Screen::NowPlaying || app.view.selected < 0 ||
-        app.view.selected >= static_cast<int>(app.view.items.size()))
+    if (app.view.selected < 0 || app.view.selected >= static_cast<int>(app.view.itemCount()))
         return;
     const auto selected = static_cast<size_t>(app.view.selected);
-    const auto& item = app.view.items[selected];
-    switch (item.action) {
-        case ViewAction::OpenSongs:
+    if (const auto* tracks = std::get_if<TrackListView>(&app.view.content)) {
+        const size_t trackIndex = tracks->trackIndexes[selected];
+        playTrack(app, trackIndex, tracks->trackIndexes, selected);
+        return;
+    }
+    const auto* menu = std::get_if<MenuView>(&app.view.content);
+    if (!menu) return;
+    switch (menu->items[selected].intent) {
+        case NavigationIntent::OpenSongs:
             pushView(app, songsView(app));
             return;
-        case ViewAction::OpenNowPlaying:
+        case NavigationIntent::OpenNowPlaying:
             openNowPlaying(app);
             return;
-        case ViewAction::OpenAbout:
-            pushView(app, {Screen::About, "About", {}, 0, 0});
+        case NavigationIntent::OpenAbout:
+            pushView(app, {Screen::About, "About", std::monostate{}, 0, 0});
             return;
-        case ViewAction::CheckForUpdates:
+        case NavigationIntent::CheckForUpdates:
             app.notice.reset();
             app.updates.check();
             return;
-        case ViewAction::InstallUpdate:
+        case NavigationIntent::InstallUpdate:
             app.notice.reset();
             app.updates.requestInstall();
             return;
-        case ViewAction::None:
-            break;
-    }
-    if (app.view.screen == Screen::Songs) {
-        if (item.trackIndex)
-            playTrack(app, *item.trackIndex, app.library.allTrackIndexes(), selected);
     }
 }
 

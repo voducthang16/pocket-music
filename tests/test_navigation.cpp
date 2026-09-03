@@ -1,6 +1,7 @@
 #include <chrono>
 #include <fstream>
 #include <memory>
+#include <numeric>
 #include <thread>
 
 #include "app/app_state.hpp"
@@ -11,6 +12,20 @@
 #include "ui/presentation.hpp"
 namespace fs = std::filesystem;
 namespace {
+const std::vector<MenuItem>& menuItems(const AppState& app) {
+    return std::get<MenuView>(app.view.content).items;
+}
+
+const std::vector<size_t>& trackIndexes(const AppState& app) {
+    return std::get<TrackListView>(app.view.content).trackIndexes;
+}
+
+std::vector<size_t> indexSequence(size_t count) {
+    std::vector<size_t> indexes(count);
+    std::iota(indexes.begin(), indexes.end(), 0);
+    return indexes;
+}
+
 UpdateRuntimePaths updatePaths(const fs::path& appDir, const fs::path& dataDir,
                                const fs::path& preparer) {
     return {appDir, dataDir, preparer};
@@ -34,6 +49,8 @@ void navigationQueue() {
     selectCurrentItem(app);
     require(app.view.screen == Screen::Songs && app.history.size() == 1,
             "Songs must push the Songs view");
+    require(trackIndexes(app) == std::vector<size_t>({0, 1}),
+            "Songs view must contain track identity without copied presentation metadata");
     app.view.selected = 1;
     selectCurrentItem(app);
     require(app.view.screen == Screen::NowPlaying && app.history.size() == 2,
@@ -58,7 +75,8 @@ void failedLoad() {
     AppState app(music, std::move(player));
     require(app.library.scan(), "failure fixture must scan");
     buildHomeView(app);
-    require(!playTrack(app, 0, app.library.allTrackIndexes()), "load failure must propagate");
+    require(!playTrack(app, 0, indexSequence(app.library.tracks().size())),
+            "load failure must propagate");
     require(
         !app.playback.snapshot().trackIndex && app.playback.queue().empty() && app.history.empty(),
         "load failure must not mutate navigation or queue state");
@@ -76,23 +94,24 @@ void homeRowsExposePrimaryDestinations() {
 
     buildHomeView(app);
 
-    require(app.view.items[0].subtitle == "2", "Songs must expose a compact numeric count");
-    require(app.view.items.size() == 4, "Home must contain the update check destination");
-    require(app.view.items[1].title == "Now Playing" && app.view.items[1].subtitle.empty(),
+    const auto& items = menuItems(app);
+    require(items[0].trailing == "2", "Songs must expose a compact numeric count");
+    require(items.size() == 4, "Home must contain the update check destination");
+    require(items[1].title == "Now Playing" && items[1].trailing.empty(),
             "Now Playing must be a single-line destination");
-    require(app.view.items[2].title == "About" && app.view.items[2].subtitle.empty(),
+    require(items[2].title == "About" && items[2].trailing.empty(),
             "About must be a single-line destination");
-    require(app.view.items[3].title == "Check for Updates" && app.view.items[3].subtitle.empty(),
+    require(items[3].title == "Check for Updates" && items[3].trailing.empty(),
             "Home must expose remote update checks");
 }
 
 void presentationMappingsAreSemantic() {
-    ViewItem install{"Install Update", "v0.2.7", ViewAction::InstallUpdate, std::nullopt};
+    MenuItem install{"Install Update", "v0.2.7", NavigationIntent::InstallUpdate};
     const auto installRow = homeRowPresentation(install);
     require(installRow.trailing == "v0.2.7" && !installRow.chevron,
             "Home rows with details must render the actual item detail instead of a chevron");
 
-    ViewItem destination{"About", "", ViewAction::OpenAbout, std::nullopt};
+    MenuItem destination{"About", "", NavigationIntent::OpenAbout};
     require(homeRowPresentation(destination).chevron,
             "Home destinations without details must render a chevron");
 
@@ -158,10 +177,11 @@ void updateCheckRunsInsideApp() {
     const auto notice = app.updates.takeNotice();
     require(notice && *notice == "v0.2.5 is ready to install",
             "ready update must be emitted as a transient notice");
-    require(app.view.items.size() == 5 && app.view.items[4].title == "Install Update" &&
-                app.view.items[4].subtitle == "v0.2.5",
-            "completed check must refresh Home from the pending manifest");
-    const auto installRow = homeRowPresentation(app.view.items[4]);
+    const auto& items = menuItems(app);
+    require(
+        items.size() == 5 && items[4].title == "Install Update" && items[4].trailing == "v0.2.5",
+        "completed check must refresh Home from the pending manifest");
+    const auto installRow = homeRowPresentation(items[4]);
     require(installRow.trailing == "v0.2.5" && !installRow.chevron,
             "Install Update must present its pending version as trailing text");
 }
@@ -222,8 +242,9 @@ void pendingUpdateRequiresExplicitInstallAction() {
                  updatePaths(appDir, dataDir, preparer));
     buildHomeView(app);
 
-    require(app.view.items.size() == 5, "pending update must add an explicit install destination");
-    require(app.view.items[4].title == "Install Update" && app.view.items[4].subtitle == "v0.2.5",
+    const auto& items = menuItems(app);
+    require(items.size() == 5, "pending update must add an explicit install destination");
+    require(items[4].title == "Install Update" && items[4].trailing == "v0.2.5",
             "pending update must show the version before installation");
     app.view.selected = 4;
     require(app.updates.requestInstall(), "install action must create a launcher request");
@@ -326,7 +347,7 @@ void trimuiFaceButtonMapping() {
     handleInputAction(app, *controllerInputAction(SDL_CONTROLLER_BUTTON_A));
     require(app.view.screen == Screen::Home, "TrimUI B button must navigate back");
 
-    require(app.playback.play(0, app.library.allTrackIndexes()),
+    require(app.playback.play(0, indexSequence(app.library.tracks().size())),
             "controller fixture must start playback");
     handleInputAction(app, *controllerInputAction(SDL_CONTROLLER_BUTTON_X));
     require(app.playback.shuffle(), "TrimUI Y button must toggle shuffle");
@@ -405,7 +426,8 @@ void openingNowPlayingUsesOneNavigationPath() {
     AppState app(music, std::make_unique<FakePlayer>());
     require(app.library.scan(), "navigation fixture must scan");
     buildHomeView(app);
-    require(app.playback.play(0, app.library.allTrackIndexes()), "track load must begin");
+    require(app.playback.play(0, indexSequence(app.library.tracks().size())),
+            "track load must begin");
 
     openNowPlaying(app);
     require(app.view.screen == Screen::NowPlaying && app.history.size() == 1,

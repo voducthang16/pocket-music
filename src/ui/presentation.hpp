@@ -9,8 +9,8 @@ struct HomeRowPresentation {
     bool chevron = false;
 };
 
-inline HomeRowPresentation homeRowPresentation(const ViewItem& item) {
-    return {item.subtitle, item.subtitle.empty()};
+inline HomeRowPresentation homeRowPresentation(const MenuItem& item) {
+    return {item.trailing, item.trailing.empty()};
 }
 
 struct PlaybackPresentation {

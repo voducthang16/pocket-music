@@ -14,12 +14,12 @@ void drawEmptyState(AppState& app) {
 void drawSongsScreen(AppState& app) {
     drawText(app.renderer, app.titleFont, "Songs", layout::headingX, layout::headingTitleY,
              app.theme.text, 400);
-    const size_t count = app.view.items.size();
+    const auto& indexes = std::get<TrackListView>(app.view.content).trackIndexes;
+    const size_t count = indexes.size();
     drawText(app.renderer, app.smallFont,
              std::to_string(count) + (count == 1 ? " TRACK" : " TRACKS"), layout::headingX,
              layout::headingSubtitleY, app.theme.accent, 360);
-    const auto& items = app.view.items;
-    if (items.empty()) {
+    if (indexes.empty()) {
         drawEmptyState(app);
         drawNowPlayingBand(app);
         return;
@@ -28,15 +28,12 @@ void drawSongsScreen(AppState& app) {
     if (app.view.selected < app.view.scroll) app.view.scroll = app.view.selected;
     if (app.view.selected >= app.view.scroll + visibleRows)
         app.view.scroll = app.view.selected - visibleRows + 1;
-    for (int row = 0; row < visibleRows && app.view.scroll + row < static_cast<int>(items.size());
+    for (int row = 0; row < visibleRows && app.view.scroll + row < static_cast<int>(indexes.size());
          ++row) {
         const int index = app.view.scroll + row;
         const int y = layout::contentRowsY + row * layout::contentRowHeight;
-        const Track& track = app.library.tracks()[*items[index].trackIndex];
-        ViewItem display = items[index];
-        display.subtitle = track.artist;
-        if (!track.album.empty()) display.subtitle += "  ·  " + track.album;
-        drawTrackRow(app, display, index, y, index == app.view.selected,
+        const Track& track = app.library.tracks()[indexes[index]];
+        drawTrackRow(app, track, index, y, index == app.view.selected,
                      formatDuration(track.durationSeconds));
     }
     drawNowPlayingBand(app);

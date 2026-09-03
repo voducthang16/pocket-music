@@ -8,7 +8,7 @@ void drawHomeScreen(AppState& app) {
              app.theme.text, 360);
     drawText(app.renderer, app.smallFont, "YOUR MUSIC COLLECTION  |  v" POCKET_MUSIC_VERSION,
              layout::headingX, layout::headingSubtitleY, app.theme.accent, 360);
-    const auto& items = app.view.items;
+    const auto& items = std::get<MenuView>(app.view.content).items;
     for (int index = 0; index < static_cast<int>(items.size()); ++index) {
         const int y = layout::contentRowsY + index * layout::contentRowHeight;
         const auto presentation = homeRowPresentation(items[index]);

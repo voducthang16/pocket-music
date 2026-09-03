@@ -5,7 +5,6 @@ SD_ROOT=/mnt/SDCARD
 DATA_DIR="$APP_DIR/data"
 LOG_FILE="$SD_ROOT/pocket-music.log"
 UPDATE_DIR="$DATA_DIR/update"
-CHECK_REQUESTED="$UPDATE_DIR/check-requested"
 INSTALL_REQUESTED="$UPDATE_DIR/install-requested"
 PENDING_UPDATE="$UPDATE_DIR/pending-update"
 IN_PROGRESS="$UPDATE_DIR/update-in-progress"
@@ -43,7 +42,7 @@ fi
 
 export HOME="$DATA_DIR"
 export PATH="$APP_DIR/bin:$PATH"
-export LD_LIBRARY_PATH="$APP_DIR/lib:/usr/trimui/lib:$LD_LIBRARY_PATH"
+export LD_LIBRARY_PATH="/usr/trimui/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export POCKET_MUSIC_FONT="$APP_DIR/assets/fonts/NotoSans-Regular.ttf"
 export POCKET_MUSIC_APP_DIR="$APP_DIR"
 export POCKET_MUSIC_DATA_DIR="$DATA_DIR"
@@ -69,22 +68,8 @@ if [ -f "$INSTALL_REQUESTED" ]; then
     sync
 
     APPLY_OUTPUT=$("$RECOVERY_HELPER" "$APP_DIR" "$DATA_DIR" 2>&1)
-    APPLY_STATUS=$?
     write_update_result "$APPLY_OUTPUT"
-    [ "$APPLY_STATUS" -eq 0 ] || true
   fi
-
-  sync
-  exec "$APP_DIR/launch.sh"
-fi
-
-if [ -f "$CHECK_REQUESTED" ] && [ -x "$APP_DIR/update/check-update.sh" ]; then
-  rm -f "$CHECK_REQUESTED"
-  CURRENT_VERSION=$("$APP_DIR/bin/pocket-music" --version 2>/dev/null)
-  CHECK_OUTPUT=$("$APP_DIR/update/check-update.sh" "$CURRENT_VERSION" "$APP_DIR" "$DATA_DIR" 2>&1)
-  CHECK_STATUS=$?
-  write_update_result "$CHECK_OUTPUT"
-  [ "$CHECK_STATUS" -eq 0 ] || [ "$CHECK_STATUS" -eq 10 ] || true
 
   sync
   exec "$APP_DIR/launch.sh"

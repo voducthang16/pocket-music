@@ -12,6 +12,7 @@ bool requestUpdateCheck(AppState& app);
 void pollUpdateCheck(AppState& app);
 void cancelUpdateCheck(AppState& app);
 bool requestUpdateInstall(AppState& app);
+void finishDeferredUpdateHandoff(AppState& app);
 void selectCurrentItem(AppState& app);
 void navigateBack(AppState& app);
 void advanceWhenFinished(AppState& app);

@@ -78,8 +78,8 @@ add_executable(pocket-music
   src/ui/input.cpp
   src/ui/primitives.cpp
   src/ui/renderer.cpp
+  src/ui/renderer_about.cpp
   src/ui/renderer_home.cpp
-  src/ui/renderer_liner_notes.cpp
   src/ui/renderer_now_playing.cpp
   src/ui/renderer_shared.cpp
   src/ui/renderer_songs.cpp

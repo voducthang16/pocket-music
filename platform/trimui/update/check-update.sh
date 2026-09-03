@@ -55,7 +55,6 @@ else
 fi
 
 need_command sha256sum
-need_command tar
 
 field() {
   sed -n "s/^$1=//p" "$MANIFEST" | head -n 1

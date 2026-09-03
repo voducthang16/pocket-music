@@ -1,4 +1,25 @@
 #pragma once
+
+#include <optional>
+
 #include "app/app_state.hpp"
-void handleKey(AppState& app, SDL_Keycode code);
-void handleControllerButton(AppState& app, Uint8 button);
+
+enum class InputAction {
+    Up,
+    Down,
+    SeekBack,
+    SeekForward,
+    Confirm,
+    Back,
+    PlayPause,
+    Previous,
+    Next,
+    NowPlaying,
+    Shuffle,
+    Repeat,
+};
+
+std::optional<InputAction> keyboardInputAction(SDL_Keycode code);
+std::optional<InputAction> controllerInputAction(Uint8 button);
+bool isRepeatable(InputAction action);
+void handleInputAction(AppState& app, InputAction action);

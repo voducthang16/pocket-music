@@ -1,6 +1,7 @@
 #include <chrono>
 #include <fstream>
 #include <memory>
+#include <numeric>
 #include <thread>
 
 #include "app/app_state.hpp"
@@ -11,6 +12,20 @@
 #include "ui/presentation.hpp"
 namespace fs = std::filesystem;
 namespace {
+const std::vector<MenuItem>& menuItems(const AppState& app) {
+    return std::get<MenuView>(app.view.content).items;
+}
+
+const std::vector<size_t>& trackIndexes(const AppState& app) {
+    return std::get<TrackListView>(app.view.content).trackIndexes;
+}
+
+std::vector<size_t> indexSequence(size_t count) {
+    std::vector<size_t> indexes(count);
+    std::iota(indexes.begin(), indexes.end(), 0);
+    return indexes;
+}
+
 UpdateRuntimePaths updatePaths(const fs::path& appDir, const fs::path& dataDir,
                                const fs::path& preparer) {
     return {appDir, dataDir, preparer};
@@ -34,6 +49,8 @@ void navigationQueue() {
     selectCurrentItem(app);
     require(app.view.screen == Screen::Songs && app.history.size() == 1,
             "Songs must push the Songs view");
+    require(trackIndexes(app) == std::vector<size_t>({0, 1}),
+            "Songs view must contain track identity without copied presentation metadata");
     app.view.selected = 1;
     selectCurrentItem(app);
     require(app.view.screen == Screen::NowPlaying && app.history.size() == 2,
@@ -58,7 +75,8 @@ void failedLoad() {
     AppState app(music, std::move(player));
     require(app.library.scan(), "failure fixture must scan");
     buildHomeView(app);
-    require(!playTrack(app, 0, app.library.allTrackIndexes()), "load failure must propagate");
+    require(!playTrack(app, 0, indexSequence(app.library.tracks().size())),
+            "load failure must propagate");
     require(
         !app.playback.snapshot().trackIndex && app.playback.queue().empty() && app.history.empty(),
         "load failure must not mutate navigation or queue state");
@@ -76,23 +94,24 @@ void homeRowsExposePrimaryDestinations() {
 
     buildHomeView(app);
 
-    require(app.view.items[0].subtitle == "2", "Songs must expose a compact numeric count");
-    require(app.view.items.size() == 4, "Home must contain the update check destination");
-    require(app.view.items[1].title == "Now Playing" && app.view.items[1].subtitle.empty(),
+    const auto& items = menuItems(app);
+    require(items[0].trailing == "2", "Songs must expose a compact numeric count");
+    require(items.size() == 4, "Home must contain the update check destination");
+    require(items[1].title == "Now Playing" && items[1].trailing.empty(),
             "Now Playing must be a single-line destination");
-    require(app.view.items[2].title == "About" && app.view.items[2].subtitle.empty(),
+    require(items[2].title == "About" && items[2].trailing.empty(),
             "About must be a single-line destination");
-    require(app.view.items[3].title == "Check for Updates" && app.view.items[3].subtitle.empty(),
+    require(items[3].title == "Check for Updates" && items[3].trailing.empty(),
             "Home must expose remote update checks");
 }
 
 void presentationMappingsAreSemantic() {
-    ViewItem install{"Install Update", "v0.2.7", ViewAction::InstallUpdate, std::nullopt};
+    MenuItem install{"Install Update", "v0.2.7", MenuAction::InstallUpdate};
     const auto installRow = homeRowPresentation(install);
     require(installRow.trailing == "v0.2.7" && !installRow.chevron,
             "Home rows with details must render the actual item detail instead of a chevron");
 
-    ViewItem destination{"About", "", ViewAction::OpenAbout, std::nullopt};
+    MenuItem destination{"About", "", MenuAction::OpenAbout};
     require(homeRowPresentation(destination).chevron,
             "Home destinations without details must render a chevron");
 
@@ -143,7 +162,7 @@ void updateCheckRunsInsideApp() {
     require(app.updates.state().checking(),
             "update check must expose semantic active state without a process id");
 
-    handleKey(app, SDLK_DOWN);
+    handleInputAction(app, InputAction::Down);
     require(app.view.selected == 3, "update loading modal must block duplicate navigation input");
 
     for (int attempt = 0; attempt < 100 && app.updates.state().checking(); ++attempt) {
@@ -158,10 +177,11 @@ void updateCheckRunsInsideApp() {
     const auto notice = app.updates.takeNotice();
     require(notice && *notice == "v0.2.5 is ready to install",
             "ready update must be emitted as a transient notice");
-    require(app.view.items.size() == 5 && app.view.items[4].title == "Install Update" &&
-                app.view.items[4].subtitle == "v0.2.5",
-            "completed check must refresh Home from the pending manifest");
-    const auto installRow = homeRowPresentation(app.view.items[4]);
+    const auto& items = menuItems(app);
+    require(
+        items.size() == 5 && items[4].title == "Install Update" && items[4].trailing == "v0.2.5",
+        "completed check must refresh Home from the pending manifest");
+    const auto installRow = homeRowPresentation(items[4]);
     require(installRow.trailing == "v0.2.5" && !installRow.chevron,
             "Install Update must present its pending version as trailing text");
 }
@@ -189,7 +209,7 @@ void updateCancellationIsNonBlocking() {
     require(app.updates.check(), "cancellation fixture must start preparer");
 
     const auto started = std::chrono::steady_clock::now();
-    handleKey(app, SDLK_b);
+    handleInputAction(app, InputAction::Back);
     const auto elapsed = std::chrono::steady_clock::now() - started;
     require(elapsed < std::chrono::milliseconds(200),
             "cancel input must not block waiting for the update preparer");
@@ -222,8 +242,9 @@ void pendingUpdateRequiresExplicitInstallAction() {
                  updatePaths(appDir, dataDir, preparer));
     buildHomeView(app);
 
-    require(app.view.items.size() == 5, "pending update must add an explicit install destination");
-    require(app.view.items[4].title == "Install Update" && app.view.items[4].subtitle == "v0.2.5",
+    const auto& items = menuItems(app);
+    require(items.size() == 5, "pending update must add an explicit install destination");
+    require(items[4].title == "Install Update" && items[4].trailing == "v0.2.5",
             "pending update must show the version before installation");
     app.view.selected = 4;
     require(app.updates.requestInstall(), "install action must create a launcher request");
@@ -235,7 +256,7 @@ void pendingUpdateRequiresExplicitInstallAction() {
     require(fs::exists(dataDir / "update" / "install-requested"),
             "install request marker must be persisted before shutdown");
 
-    handleKey(app, SDLK_DOWN);
+    handleInputAction(app, InputAction::Down);
     require(app.view.selected == 4, "install handoff modal must block navigation input");
 
     finishDeferredUpdateHandoff(app);
@@ -294,6 +315,46 @@ void updateCheckIsTrimuiOnly() {
     require(notice && !notice->empty(), "unsupported update check must emit a user notice");
 }
 
+void inputAdaptersMapToSemanticActions() {
+    require(keyboardInputAction(SDLK_UP) == InputAction::Up &&
+                keyboardInputAction(SDLK_DOWN) == InputAction::Down &&
+                keyboardInputAction(SDLK_LEFT) == InputAction::SeekBack &&
+                keyboardInputAction(SDLK_RIGHT) == InputAction::SeekForward &&
+                keyboardInputAction(SDLK_RETURN) == InputAction::Confirm &&
+                keyboardInputAction(SDLK_b) == InputAction::Back &&
+                keyboardInputAction(SDLK_SPACE) == InputAction::PlayPause &&
+                keyboardInputAction(SDLK_q) == InputAction::Previous &&
+                keyboardInputAction(SDLK_e) == InputAction::Next &&
+                keyboardInputAction(SDLK_x) == InputAction::NowPlaying &&
+                keyboardInputAction(SDLK_y) == InputAction::Shuffle &&
+                keyboardInputAction(SDLK_r) == InputAction::Repeat,
+            "keyboard controls must map to semantic application actions");
+    require(isRepeatable(InputAction::Up) && isRepeatable(InputAction::Down) &&
+                isRepeatable(InputAction::SeekBack) && isRepeatable(InputAction::SeekForward) &&
+                !isRepeatable(InputAction::Confirm),
+            "only directional controls must repeat");
+    require(controllerInputAction(SDL_CONTROLLER_BUTTON_B) == InputAction::Confirm,
+            "TrimUI physical A must map directly to semantic Confirm");
+    require(controllerInputAction(SDL_CONTROLLER_BUTTON_A) == InputAction::Back,
+            "TrimUI physical B must map directly to semantic Back");
+    require(controllerInputAction(SDL_CONTROLLER_BUTTON_X) == InputAction::Shuffle &&
+                controllerInputAction(SDL_CONTROLLER_BUTTON_Y) == InputAction::NowPlaying,
+            "TrimUI X/Y reversal must remain isolated in the controller adapter");
+    require(
+        controllerInputAction(SDL_CONTROLLER_BUTTON_DPAD_UP) == InputAction::Up &&
+            controllerInputAction(SDL_CONTROLLER_BUTTON_DPAD_DOWN) == InputAction::Down &&
+            controllerInputAction(SDL_CONTROLLER_BUTTON_DPAD_LEFT) == InputAction::SeekBack &&
+            controllerInputAction(SDL_CONTROLLER_BUTTON_DPAD_RIGHT) == InputAction::SeekForward &&
+            controllerInputAction(SDL_CONTROLLER_BUTTON_START) == InputAction::PlayPause &&
+            controllerInputAction(SDL_CONTROLLER_BUTTON_BACK) == InputAction::Repeat &&
+            controllerInputAction(SDL_CONTROLLER_BUTTON_LEFTSHOULDER) == InputAction::Previous &&
+            controllerInputAction(SDL_CONTROLLER_BUTTON_RIGHTSHOULDER) == InputAction::Next,
+        "TrimUI directional, transport, shoulder, and Select controls must retain behavior");
+    require(
+        !keyboardInputAction(SDLK_UNKNOWN) && !controllerInputAction(SDL_CONTROLLER_BUTTON_INVALID),
+        "unmapped physical input must not invent an application action");
+}
+
 void trimuiFaceButtonMapping() {
     TemporaryDirectory temporary;
     const auto music = temporary.path / "Music";
@@ -302,19 +363,19 @@ void trimuiFaceButtonMapping() {
     require(app.library.scan(), "controller fixture must scan");
     buildHomeView(app);
 
-    handleControllerButton(app, SDL_CONTROLLER_BUTTON_B);
+    handleInputAction(app, *controllerInputAction(SDL_CONTROLLER_BUTTON_B));
     require(app.view.screen == Screen::Songs, "TrimUI A button must select Songs");
 
-    handleControllerButton(app, SDL_CONTROLLER_BUTTON_A);
+    handleInputAction(app, *controllerInputAction(SDL_CONTROLLER_BUTTON_A));
     require(app.view.screen == Screen::Home, "TrimUI B button must navigate back");
 
-    require(app.playback.play(0, app.library.allTrackIndexes()),
+    require(app.playback.play(0, indexSequence(app.library.tracks().size())),
             "controller fixture must start playback");
-    handleControllerButton(app, SDL_CONTROLLER_BUTTON_X);
+    handleInputAction(app, *controllerInputAction(SDL_CONTROLLER_BUTTON_X));
     require(app.playback.shuffle(), "TrimUI Y button must toggle shuffle");
     require(app.view.screen == Screen::Home, "TrimUI Y button must not open Now Playing");
 
-    handleControllerButton(app, SDL_CONTROLLER_BUTTON_Y);
+    handleInputAction(app, *controllerInputAction(SDL_CONTROLLER_BUTTON_Y));
     require(app.view.screen == Screen::NowPlaying, "TrimUI X button must open Now Playing");
 }
 
@@ -322,12 +383,12 @@ void trimuiSelectCyclesRepeatMode() {
     TemporaryDirectory temporary;
     AppState app(temporary.path / "Music", std::make_unique<FakePlayer>());
 
-    handleControllerButton(app, SDL_CONTROLLER_BUTTON_BACK);
+    handleInputAction(app, *controllerInputAction(SDL_CONTROLLER_BUTTON_BACK));
     require(app.playback.repeatMode() == RepeatMode::One, "TrimUI Select must enable repeat one");
-    handleControllerButton(app, SDL_CONTROLLER_BUTTON_BACK);
+    handleInputAction(app, *controllerInputAction(SDL_CONTROLLER_BUTTON_BACK));
     require(app.playback.repeatMode() == RepeatMode::All,
             "TrimUI Select must advance to repeat all");
-    handleControllerButton(app, SDL_CONTROLLER_BUTTON_BACK);
+    handleInputAction(app, *controllerInputAction(SDL_CONTROLLER_BUTTON_BACK));
     require(app.playback.repeatMode() == RepeatMode::Off,
             "TrimUI Select must cycle repeat back to off");
 }
@@ -353,17 +414,17 @@ void homeExitRequiresConfirmation() {
     AppState app(temporary.path / "Music", std::make_unique<FakePlayer>());
     buildHomeView(app);
 
-    handleKey(app, SDLK_b);
+    handleInputAction(app, InputAction::Back);
     require(app.running && app.exitConfirmationOpen && app.exitConfirmationSelection == 0,
             "Home Back must open exit confirmation on Stay");
 
-    handleKey(app, SDLK_RETURN);
+    handleInputAction(app, InputAction::Confirm);
     require(app.running && !app.exitConfirmationOpen,
             "confirming Stay must close the dialog and keep running");
 
-    handleKey(app, SDLK_b);
-    handleKey(app, SDLK_RIGHT);
-    handleKey(app, SDLK_RETURN);
+    handleInputAction(app, InputAction::Back);
+    handleInputAction(app, InputAction::SeekForward);
+    handleInputAction(app, InputAction::Confirm);
     require(!app.running, "confirming Exit must stop the app");
 }
 
@@ -387,7 +448,8 @@ void openingNowPlayingUsesOneNavigationPath() {
     AppState app(music, std::make_unique<FakePlayer>());
     require(app.library.scan(), "navigation fixture must scan");
     buildHomeView(app);
-    require(app.playback.play(0, app.library.allTrackIndexes()), "track load must begin");
+    require(app.playback.play(0, indexSequence(app.library.tracks().size())),
+            "track load must begin");
 
     openNowPlaying(app);
     require(app.view.screen == Screen::NowPlaying && app.history.size() == 1,
@@ -409,6 +471,7 @@ void addNavigationTests(TestCases& tests) {
                        updateInstallRequiresPendingUpdate);
     tests.emplace_back("update status uses notice channel", updateStatusUsesNoticeChannel);
     tests.emplace_back("update check is TrimUI only", updateCheckIsTrimuiOnly);
+    tests.emplace_back("semantic input adapters", inputAdaptersMapToSemanticActions);
     tests.emplace_back("TrimUI face button mapping", trimuiFaceButtonMapping);
     tests.emplace_back("TrimUI Select repeat mapping", trimuiSelectCyclesRepeatMode);
     tests.emplace_back("restored Now Playing back returns to Home",

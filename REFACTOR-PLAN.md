@@ -327,28 +327,28 @@ enum class InputAction {
 };
 ```
 
-- [ ] Map keyboard input to `InputAction`.
-- [ ] Map TrimUI/SDL controller input to `InputAction`.
-- [ ] Handle application behavior once from semantic actions.
-- [ ] Keep physical TrimUI A/B/X/Y reversal isolated in the controller adapter.
+- [x] Map keyboard input to `InputAction`.
+- [x] Map TrimUI/SDL controller input to `InputAction`.
+- [x] Handle application behavior once from semantic actions.
+- [x] Keep physical TrimUI A/B/X/Y reversal isolated in the controller adapter.
 
 ## 3.2 Replace generic `ViewItem` track/menu union
 
 Finding: one `ViewItem` type represents both menu commands and tracks using optional fields and invalid combinations. Songs also duplicates title/artist into the item then re-reads metadata at render time.
 
-- [ ] Separate menu-item state from track-list state.
-- [ ] Store track IDs/indexes for Songs rather than duplicated title/artist strings.
-- [ ] Render current metadata from `MusicLibrary` as the source of truth.
-- [ ] Avoid row-index-based semantics.
-- [ ] Design this only for current needs; do not pre-build Albums/Artists in this phase.
+- [x] Separate menu-item state from track-list state.
+- [x] Store track IDs/indexes for Songs rather than duplicated title/artist strings.
+- [x] Render current metadata from `MusicLibrary` as the source of truth.
+- [x] Avoid row-index-based semantics.
+- [x] Design this only for current needs; do not pre-build Albums/Artists in this phase.
 
 ## 3.3 Remove `MusicLibrary::allTrackIndexes_` cached identity vector
 
 Finding: it is always `0..N-1` and duplicates the shape of `tracks_`.
 
-- [ ] Remove the stored identity vector.
-- [ ] Generate a queue/source sequence at the call site or via a lightweight helper when needed.
-- [ ] Keep `MusicLibrary` focused on track/library data.
+- [x] Remove the stored identity vector.
+- [x] Generate a queue/source sequence at the call site or via a lightweight helper when needed.
+- [x] Keep `MusicLibrary` focused on track/library data.
 
 ## 3.4 Re-evaluate duplicate queue-entry support
 
@@ -516,9 +516,9 @@ This index keeps the original audit findings traceable to tasks above.
 - [x] Update result state doubles as notification system → 2.8
 - [x] Managed installer path knowledge repeated → 2.9
 - [x] Launcher orchestration not integration-tested → 2.10
-- [ ] Controller input translated through fake keyboard events → 3.1
-- [ ] Generic `ViewItem` duplicates/mixes track and menu data → 3.2
-- [ ] Cached `allTrackIndexes_` identity vector → 3.3
+- [x] Controller input translated through fake keyboard events → 3.1
+- [x] Generic `ViewItem` duplicates/mixes track and menu data → 3.2
+- [x] Cached `allTrackIndexes_` identity vector → 3.3
 - [ ] Duplicate-entry queue complexity before playlists exist → 3.4
 - [ ] Playback state schema carries historical complexity → 3.5
 - [ ] Manual `PlaybackController::shutdown()` creates invalid half-alive object → 3.6

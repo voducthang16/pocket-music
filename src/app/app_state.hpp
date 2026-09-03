@@ -9,6 +9,7 @@
 #include <optional>
 #include <string>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "core/ffmpeg_sdl_player.hpp"
@@ -18,14 +19,7 @@
 #include "update/update_controller.hpp"
 
 enum class Screen { Home, Songs, NowPlaying, About };
-enum class ViewAction {
-    None,
-    OpenSongs,
-    OpenNowPlaying,
-    OpenAbout,
-    CheckForUpdates,
-    InstallUpdate
-};
+enum class MenuAction { OpenSongs, OpenNowPlaying, OpenAbout, CheckForUpdates, InstallUpdate };
 
 enum class NoticeSource { Application, Playback, Update };
 
@@ -34,19 +28,35 @@ struct AppNotice {
     std::string text;
 };
 
-struct ViewItem {
+struct MenuItem {
     std::string title;
-    std::string subtitle;
-    ViewAction action = ViewAction::None;
-    std::optional<size_t> trackIndex;
+    std::string trailing;
+    MenuAction action;
 };
+
+struct MenuView {
+    std::vector<MenuItem> items;
+};
+
+struct TrackListView {
+    std::vector<size_t> trackIndexes;
+};
+
+using ViewContent = std::variant<std::monostate, MenuView, TrackListView>;
 
 struct ViewState {
     Screen screen = Screen::Home;
     std::string title = "Home";
-    std::vector<ViewItem> items;
+    ViewContent content;
     int selected = 0;
     int scroll = 0;
+
+    size_t itemCount() const {
+        if (const auto* menu = std::get_if<MenuView>(&content)) return menu->items.size();
+        if (const auto* tracks = std::get_if<TrackListView>(&content))
+            return tracks->trackIndexes.size();
+        return 0;
+    }
 };
 
 struct AppState {

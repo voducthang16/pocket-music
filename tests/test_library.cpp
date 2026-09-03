@@ -19,7 +19,6 @@ void scansSupportedAudio() {
     MusicLibrary library(music);
     require(library.scan(), "valid directory must scan");
     require(library.tracks().size() == 2, "only audio files must become tracks");
-    require(library.allTrackIndexes().size() == 2, "full-library queue must be cached");
 }
 void ignoresAppleDoubleAudioFiles() {
     TemporaryDirectory temporary;

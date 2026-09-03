@@ -96,7 +96,7 @@ std::string rowNumber(int index) {
 }
 }  // namespace
 
-void drawHomeRow(AppState& app, const ViewItem& item, int index, int y, bool active, bool chevron) {
+void drawHomeRow(AppState& app, const MenuItem& item, int index, int y, bool active, bool chevron) {
     drawRowSelection(app, y, active);
     const int smallY = centeredTextY(app.smallFont, y);
     drawTextRightAligned(app.renderer, app.smallFont, rowNumber(index), layout::contentRowsX + 48,
@@ -104,23 +104,25 @@ void drawHomeRow(AppState& app, const ViewItem& item, int index, int y, bool act
     drawText(app.renderer, app.bodyFont, item.title, layout::contentRowsX + 72,
              centeredTextY(app.bodyFont, y), app.theme.text, 380);
     constexpr int trailingRight = layout::contentRowsX + layout::contentRowsWidth - 20;
-    if (!item.subtitle.empty())
-        drawTextRightAligned(app.renderer, app.smallFont, item.subtitle, trailingRight, smallY,
+    if (!item.trailing.empty())
+        drawTextRightAligned(app.renderer, app.smallFont, item.trailing, trailingRight, smallY,
                              app.theme.textMuted);
     else if (chevron)
         drawChevron(app.renderer, trailingRight - 9, y + layout::contentRowHeight / 2,
                     active ? app.theme.accent : app.theme.textMuted);
 }
 
-void drawTrackRow(AppState& app, const ViewItem& item, int index, int y, bool active,
+void drawTrackRow(AppState& app, const Track& track, int index, int y, bool active,
                   const std::string& duration) {
     drawRowSelection(app, y, active);
     const std::string number = rowNumber(index);
     drawText(app.renderer, app.smallFont, number, layout::contentRowsX + 16, y + 18,
              active ? app.theme.accent : app.theme.textMuted, 52);
-    drawText(app.renderer, app.bodyFont, item.title, layout::contentRowsX + 72, y + 1,
+    drawText(app.renderer, app.bodyFont, track.title, layout::contentRowsX + 72, y + 1,
              app.theme.text, 316);
-    drawText(app.renderer, app.smallFont, item.subtitle, layout::contentRowsX + 72, y + 36,
+    std::string subtitle = track.artist;
+    if (!track.album.empty()) subtitle += "  ·  " + track.album;
+    drawText(app.renderer, app.smallFont, subtitle, layout::contentRowsX + 72, y + 36,
              app.theme.textMuted, 316);
     drawTextRightAligned(app.renderer, app.smallFont, duration,
                          layout::contentRowsX + layout::contentRowsWidth - 20, y + 18,

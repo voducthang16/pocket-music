@@ -6,7 +6,6 @@
 
 #include <algorithm>
 #include <cctype>
-#include <numeric>
 #include <set>
 
 namespace fs = std::filesystem;
@@ -49,7 +48,6 @@ MusicLibrary::MusicLibrary(fs::path root) : root_(std::move(root)) {}
 
 bool MusicLibrary::scan() {
     tracks_.clear();
-    allTrackIndexes_.clear();
     error_.clear();
 
     std::error_code error;
@@ -99,7 +97,5 @@ bool MusicLibrary::scan() {
 
     std::sort(tracks_.begin(), tracks_.end(),
               [](const Track& a, const Track& b) { return lower(a.title) < lower(b.title); });
-    allTrackIndexes_.resize(tracks_.size());
-    std::iota(allTrackIndexes_.begin(), allTrackIndexes_.end(), 0);
     return true;
 }

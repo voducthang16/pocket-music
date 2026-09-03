@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <memory>
+#include <numeric>
 #include <set>
 
 #include "core/playback_controller.hpp"
@@ -9,6 +10,12 @@
 namespace fs = std::filesystem;
 
 namespace {
+std::vector<size_t> trackIndexSequence(size_t count) {
+    std::vector<size_t> indexes(count);
+    std::iota(indexes.begin(), indexes.end(), 0);
+    return indexes;
+}
+
 struct PlaybackFixture {
     TemporaryDirectory temporary;
     MusicLibrary library{temporary.path / "Music"};
@@ -28,7 +35,7 @@ struct PlaybackFixture {
 
 void loadLifecycleAndStaleEvents() {
     PlaybackFixture fixture;
-    const auto& all = fixture.library.allTrackIndexes();
+    const auto all = trackIndexSequence(fixture.library.tracks().size());
     require(fixture.controller->play(0, all), "first load must start");
     require(!fixture.controller->snapshot().trackIndex,
             "a pending load must not become the active track before file-loaded");
@@ -51,7 +58,7 @@ void loadLifecycleAndStaleEvents() {
 
 void loadingFailureIsVisible() {
     PlaybackFixture fixture;
-    fixture.controller->play(0, fixture.library.allTrackIndexes());
+    fixture.controller->play(0, trackIndexSequence(fixture.library.tracks().size()));
     fixture.player->emit({PlayerEventType::Failed, 1, 0, false, "broken"});
     fixture.controller->update();
     require(fixture.controller->snapshot().phase == PlaybackPhase::Error &&
@@ -62,7 +69,7 @@ void loadingFailureIsVisible() {
 void synchronousLoadFailureCanRetry() {
     PlaybackFixture fixture;
     fixture.player->loadSucceeds = false;
-    require(!fixture.controller->play(0, fixture.library.allTrackIndexes()),
+    require(!fixture.controller->play(0, trackIndexSequence(fixture.library.tracks().size())),
             "synchronous player startup failure must propagate");
     fixture.player->loadSucceeds = true;
     fixture.controller->retry();
@@ -73,7 +80,7 @@ void synchronousLoadFailureCanRetry() {
 
 void previousUsesThreeSecondThreshold() {
     PlaybackFixture fixture;
-    const auto& all = fixture.library.allTrackIndexes();
+    const auto all = trackIndexSequence(fixture.library.tracks().size());
     fixture.controller->play(1, all);
     fixture.player->emit({PlayerEventType::FileLoaded, 1});
     fixture.player->emit({PlayerEventType::PositionChanged, 1, 8});
@@ -99,14 +106,14 @@ void shuffledCycleVisitsEveryTrack() {
 
 void repeatPoliciesRespectBoundaries() {
     PlaybackFixture fixture;
-    fixture.controller->play(2, fixture.library.allTrackIndexes());
+    fixture.controller->play(2, trackIndexSequence(fixture.library.tracks().size()));
     fixture.player->emit({PlayerEventType::FileLoaded, 1});
     fixture.player->emit({PlayerEventType::Ended, 1});
     fixture.controller->update();
     require(fixture.controller->snapshot().phase == PlaybackPhase::Finished,
             "repeat off must finish at the queue boundary");
 
-    fixture.controller->play(2, fixture.library.allTrackIndexes());
+    fixture.controller->play(2, trackIndexSequence(fixture.library.tracks().size()));
     fixture.controller->setRepeatMode(RepeatMode::One);
     fixture.player->emit({PlayerEventType::FileLoaded, 2});
     fixture.player->emit({PlayerEventType::Ended, 2});
@@ -117,7 +124,7 @@ void repeatPoliciesRespectBoundaries() {
 
 void rapidControlsRemainCumulative() {
     PlaybackFixture fixture;
-    fixture.controller->play(0, fixture.library.allTrackIndexes());
+    fixture.controller->play(0, trackIndexSequence(fixture.library.tracks().size()));
     fixture.player->emit({PlayerEventType::SeekableChanged, 1, 0, true});
     fixture.player->emit({PlayerEventType::FileLoaded, 1});
     fixture.controller->update();
@@ -147,7 +154,7 @@ void restoredQueueStartsPaused() {
 
 void automaticErrorsSkipWithBoundedAttempts() {
     PlaybackFixture fixture;
-    fixture.controller->play(0, fixture.library.allTrackIndexes());
+    fixture.controller->play(0, trackIndexSequence(fixture.library.tracks().size()));
     fixture.player->emit({PlayerEventType::FileLoaded, 1});
     fixture.player->emit({PlayerEventType::Ended, 1});
     fixture.controller->update();
@@ -177,7 +184,7 @@ void togglingShufflePreservesCurrentTrack() {
 
 void shuffledPlaybackWrapsAfterEveryTrack() {
     PlaybackFixture fixture;
-    fixture.controller->play(0, fixture.library.allTrackIndexes());
+    fixture.controller->play(0, trackIndexSequence(fixture.library.tracks().size()));
     fixture.controller->setShuffle(true, 42);
     fixture.controller->next();
     fixture.controller->next();

@@ -106,12 +106,12 @@ void homeRowsExposePrimaryDestinations() {
 }
 
 void presentationMappingsAreSemantic() {
-    MenuItem install{"Install Update", "v0.2.7", NavigationIntent::InstallUpdate};
+    MenuItem install{"Install Update", "v0.2.7", MenuAction::InstallUpdate};
     const auto installRow = homeRowPresentation(install);
     require(installRow.trailing == "v0.2.7" && !installRow.chevron,
             "Home rows with details must render the actual item detail instead of a chevron");
 
-    MenuItem destination{"About", "", NavigationIntent::OpenAbout};
+    MenuItem destination{"About", "", MenuAction::OpenAbout};
     require(homeRowPresentation(destination).chevron,
             "Home destinations without details must render a chevron");
 
@@ -316,11 +316,23 @@ void updateCheckIsTrimuiOnly() {
 }
 
 void inputAdaptersMapToSemanticActions() {
-    require(keyboardInputAction(SDLK_RETURN) == InputAction::Confirm,
-            "keyboard confirm must map to semantic Confirm");
-    require(keyboardInputAction(SDLK_LEFT) == InputAction::SeekBack &&
-                isRepeatable(*keyboardInputAction(SDLK_LEFT)),
-            "keyboard seek must map to a repeatable semantic action");
+    require(keyboardInputAction(SDLK_UP) == InputAction::Up &&
+                keyboardInputAction(SDLK_DOWN) == InputAction::Down &&
+                keyboardInputAction(SDLK_LEFT) == InputAction::SeekBack &&
+                keyboardInputAction(SDLK_RIGHT) == InputAction::SeekForward &&
+                keyboardInputAction(SDLK_RETURN) == InputAction::Confirm &&
+                keyboardInputAction(SDLK_b) == InputAction::Back &&
+                keyboardInputAction(SDLK_SPACE) == InputAction::PlayPause &&
+                keyboardInputAction(SDLK_q) == InputAction::Previous &&
+                keyboardInputAction(SDLK_e) == InputAction::Next &&
+                keyboardInputAction(SDLK_x) == InputAction::NowPlaying &&
+                keyboardInputAction(SDLK_y) == InputAction::Shuffle &&
+                keyboardInputAction(SDLK_r) == InputAction::Repeat,
+            "keyboard controls must map to semantic application actions");
+    require(isRepeatable(InputAction::Up) && isRepeatable(InputAction::Down) &&
+                isRepeatable(InputAction::SeekBack) && isRepeatable(InputAction::SeekForward) &&
+                !isRepeatable(InputAction::Confirm),
+            "only directional controls must repeat");
     require(controllerInputAction(SDL_CONTROLLER_BUTTON_B) == InputAction::Confirm,
             "TrimUI physical A must map directly to semantic Confirm");
     require(controllerInputAction(SDL_CONTROLLER_BUTTON_A) == InputAction::Back,
@@ -328,6 +340,16 @@ void inputAdaptersMapToSemanticActions() {
     require(controllerInputAction(SDL_CONTROLLER_BUTTON_X) == InputAction::Shuffle &&
                 controllerInputAction(SDL_CONTROLLER_BUTTON_Y) == InputAction::NowPlaying,
             "TrimUI X/Y reversal must remain isolated in the controller adapter");
+    require(
+        controllerInputAction(SDL_CONTROLLER_BUTTON_DPAD_UP) == InputAction::Up &&
+            controllerInputAction(SDL_CONTROLLER_BUTTON_DPAD_DOWN) == InputAction::Down &&
+            controllerInputAction(SDL_CONTROLLER_BUTTON_DPAD_LEFT) == InputAction::SeekBack &&
+            controllerInputAction(SDL_CONTROLLER_BUTTON_DPAD_RIGHT) == InputAction::SeekForward &&
+            controllerInputAction(SDL_CONTROLLER_BUTTON_START) == InputAction::PlayPause &&
+            controllerInputAction(SDL_CONTROLLER_BUTTON_BACK) == InputAction::Repeat &&
+            controllerInputAction(SDL_CONTROLLER_BUTTON_LEFTSHOULDER) == InputAction::Previous &&
+            controllerInputAction(SDL_CONTROLLER_BUTTON_RIGHTSHOULDER) == InputAction::Next,
+        "TrimUI directional, transport, shoulder, and Select controls must retain behavior");
     require(
         !keyboardInputAction(SDLK_UNKNOWN) && !controllerInputAction(SDL_CONTROLLER_BUTTON_INVALID),
         "unmapped physical input must not invent an application action");

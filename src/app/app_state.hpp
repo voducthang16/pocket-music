@@ -19,13 +19,7 @@
 #include "update/update_controller.hpp"
 
 enum class Screen { Home, Songs, NowPlaying, About };
-enum class NavigationIntent {
-    OpenSongs,
-    OpenNowPlaying,
-    OpenAbout,
-    CheckForUpdates,
-    InstallUpdate
-};
+enum class MenuAction { OpenSongs, OpenNowPlaying, OpenAbout, CheckForUpdates, InstallUpdate };
 
 enum class NoticeSource { Application, Playback, Update };
 
@@ -37,7 +31,7 @@ struct AppNotice {
 struct MenuItem {
     std::string title;
     std::string trailing;
-    NavigationIntent intent;
+    MenuAction action;
 };
 
 struct MenuView {

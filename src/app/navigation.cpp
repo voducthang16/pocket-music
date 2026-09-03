@@ -22,13 +22,13 @@ void pushView(AppState& app, ViewState next) {
 
 ViewState homeView(const AppState& app) {
     MenuView menu{{
-        {"Songs", std::to_string(app.library.tracks().size()), NavigationIntent::OpenSongs},
-        {"Now Playing", "", NavigationIntent::OpenNowPlaying},
-        {"About", "", NavigationIntent::OpenAbout},
-        {"Check for Updates", "", NavigationIntent::CheckForUpdates},
+        {"Songs", std::to_string(app.library.tracks().size()), MenuAction::OpenSongs},
+        {"Now Playing", "", MenuAction::OpenNowPlaying},
+        {"About", "", MenuAction::OpenAbout},
+        {"Check for Updates", "", MenuAction::CheckForUpdates},
     }};
     if (const auto version = app.updates.pendingVersion())
-        menu.items.push_back({"Install Update", "v" + *version, NavigationIntent::InstallUpdate});
+        menu.items.push_back({"Install Update", "v" + *version, MenuAction::InstallUpdate});
     return {Screen::Home, "Home", std::move(menu), 0, 0};
 }
 }  // namespace
@@ -85,21 +85,21 @@ void selectCurrentItem(AppState& app) {
     }
     const auto* menu = std::get_if<MenuView>(&app.view.content);
     if (!menu) return;
-    switch (menu->items[selected].intent) {
-        case NavigationIntent::OpenSongs:
+    switch (menu->items[selected].action) {
+        case MenuAction::OpenSongs:
             pushView(app, songsView(app));
             return;
-        case NavigationIntent::OpenNowPlaying:
+        case MenuAction::OpenNowPlaying:
             openNowPlaying(app);
             return;
-        case NavigationIntent::OpenAbout:
+        case MenuAction::OpenAbout:
             pushView(app, {Screen::About, "About", std::monostate{}, 0, 0});
             return;
-        case NavigationIntent::CheckForUpdates:
+        case MenuAction::CheckForUpdates:
             app.notice.reset();
             app.updates.check();
             return;
-        case NavigationIntent::InstallUpdate:
+        case MenuAction::InstallUpdate:
             app.notice.reset();
             app.updates.requestInstall();
             return;

@@ -57,8 +57,6 @@ PlaybackSession loadSession(const std::filesystem::path& path) {
             stream >> session.cursor;
         else if (key == "position")
             stream >> session.positionSeconds;
-        else if (key == "paused")
-            stream >> session.paused;
         else if (key == "shuffle")
             stream >> session.shuffle;
         else if (key == "repeat")
@@ -75,7 +73,6 @@ PlaybackSession loadSession(const std::filesystem::path& path) {
         session.positionSeconds = 0;
     if (session.repeatMode < 0 || session.repeatMode > 2) session.repeatMode = 0;
     if (session.screen != "home" && session.screen != "now-playing") session.screen = "home";
-    session.paused = true;
     if (!isConsistent(session)) return defaults();
     return session;
 }
@@ -90,7 +87,6 @@ bool saveSession(const std::filesystem::path& path, const PlaybackSession& sessi
                    ? session.positionSeconds
                    : 0)
            << '\n'
-           << "paused " << session.paused << '\n'
            << "shuffle " << session.shuffle << '\n'
            << "repeat "
            << (session.repeatMode >= 0 && session.repeatMode <= 2 ? session.repeatMode : 0) << '\n'

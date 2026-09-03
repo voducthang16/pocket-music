@@ -45,12 +45,17 @@ UpdateRuntimePaths updateRuntimePaths() {
 
     paths.appDir = rawAppDir;
     paths.dataDir = rawDataDir;
-    if (const char* rawChecker = std::getenv("POCKET_MUSIC_UPDATE_CHECKER");
-        rawChecker && *rawChecker)
-        paths.checker = rawChecker;
+    if (const char* rawPreparer = std::getenv("POCKET_MUSIC_UPDATE_PREPARER");
+        rawPreparer && *rawPreparer)
+        paths.preparer = rawPreparer;
     else
-        paths.checker = paths.appDir / "update" / "check-update.sh";
+        paths.preparer = paths.appDir / "update" / "prepare-update.sh";
     return paths;
+}
+
+void syncUpdateNotice(AppState& app) {
+    if (auto notice = app.updates.takeNotice())
+        app.notice = AppNotice{NoticeSource::Update, std::move(*notice)};
 }
 
 SDL_Texture* loadResourceTexture(SDL_Renderer* renderer, const std::filesystem::path& relative) {
@@ -139,7 +144,7 @@ int runApplication(const std::filesystem::path& musicPath, const std::filesystem
     AppState app(musicPath, std::make_unique<FfmpegSdlPlayer>(), updateRuntimePaths());
     if (!app.library.scan()) {
         std::cerr << "Music scan failed: " << app.library.error() << '\n';
-        app.message = app.library.error();
+        app.notice = AppNotice{NoticeSource::Application, app.library.error()};
     }
     buildHomeView(app);
     if (!initializeUi(app, fullscreen)) {
@@ -148,6 +153,7 @@ int runApplication(const std::filesystem::path& musicPath, const std::filesystem
         return 1;
     }
     app.updates.consumeLastStatus();
+    syncUpdateNotice(app);
     restore(app, statePath);
     uint64_t savedRevision = app.playback.revision();
     Uint64 lastSessionSave = SDL_GetTicks64();
@@ -181,6 +187,7 @@ int runApplication(const std::filesystem::path& musicPath, const std::filesystem
             nextControllerRepeat = SDL_GetTicks64() + 90;
         }
         if (app.updates.poll()) refreshHomeView(app);
+        syncUpdateNotice(app);
         advanceWhenFinished(app);
         const Uint64 now = SDL_GetTicks64();
         const bool periodicSave =

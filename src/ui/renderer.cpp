@@ -79,7 +79,8 @@ void renderApp(AppState& app) {
 
     const std::string updateMessage = updateResultMessage(app);
     const std::string& bannerMessage = updateMessage.empty() ? app.message : updateMessage;
-    if (!bannerMessage.empty() && app.view.screen != Screen::NowPlaying && !app.update.modalVisible()) {
+    if (!bannerMessage.empty() && app.view.screen != Screen::NowPlaying &&
+        !app.update.modalVisible()) {
         const SDL_Rect banner{layout::messageBannerX, layout::messageBannerY,
                               layout::messageBannerWidth, layout::messageBannerHeight};
         SDL_Color surface = app.theme.surfaceRaised;

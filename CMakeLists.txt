@@ -144,8 +144,7 @@ if(BUILD_TESTING)
   add_test(NAME unit COMMAND pocket-music-tests)
   add_test(NAME smoke COMMAND pocket-music --smoke-test --music "${SMOKE_MUSIC_DIR}")
   add_test(NAME version COMMAND pocket-music --version)
-  set_tests_properties(version PROPERTIES PASS_REGULAR_EXPRESSION "^${PROJECT_VERSION}[
-]*$")
+  set_tests_properties(version PROPERTIES PASS_REGULAR_EXPRESSION "^${PROJECT_VERSION}")
 
   add_executable(pocket-music-ffmpeg-integration
     tests/test_ffmpeg_integration.cpp

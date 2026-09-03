@@ -2,18 +2,7 @@
 
 #include <string>
 
-enum class UpdatePhase {
-    Idle,
-    Checking,
-    Downloading,
-    Verifying,
-    Cancelling,
-    UpToDate,
-    Ready,
-    PreparingInstall,
-    Result,
-    Error
-};
+enum class UpdatePhase { Idle, Checking, Downloading, Verifying, Cancelling, PreparingInstall };
 
 struct UpdateState {
     UpdatePhase phase = UpdatePhase::Idle;

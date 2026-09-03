@@ -1,5 +1,4 @@
 #include <chrono>
-#include <cstdlib>
 #include <fstream>
 #include <memory>
 #include <thread>
@@ -12,6 +11,16 @@
 #include "ui/presentation.hpp"
 namespace fs = std::filesystem;
 namespace {
+UpdateRuntimePaths updatePaths(const fs::path& appDir, const fs::path& dataDir,
+                               const fs::path& checker) {
+    return {appDir, dataDir, checker};
+}
+
+void makeExecutable(const fs::path& path) {
+    fs::permissions(path, fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec,
+                    fs::perm_options::add);
+}
+
 void navigationQueue() {
     TemporaryDirectory temporary;
     const auto music = temporary.path / "Music";
@@ -39,6 +48,7 @@ void navigationQueue() {
     navigateBack(app);
     require(app.view.screen == Screen::Home, "second Back must restore Home");
 }
+
 void failedLoad() {
     TemporaryDirectory temporary;
     const auto music = temporary.path / "Music";
@@ -62,7 +72,6 @@ void homeRowsExposePrimaryDestinations() {
     touch(music / "Album" / "Two.mp3");
     AppState app(music, std::make_unique<FakePlayer>());
     require(app.library.scan(), "Home fixture must scan");
-    unsetenv("POCKET_MUSIC_DATA_DIR");
 
     buildHomeView(app);
 
@@ -121,70 +130,106 @@ void updateCheckRunsInsideApp() {
                   "\"$3/update/pending-update\"\n"
                   "exit 10\n";
     }
-    fs::permissions(checker, fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec,
-                    fs::perm_options::add);
+    makeExecutable(checker);
 
-    setenv("POCKET_MUSIC_APP_DIR", appDir.c_str(), 1);
-    setenv("POCKET_MUSIC_DATA_DIR", dataDir.c_str(), 1);
-    setenv("POCKET_MUSIC_UPDATE_CHECKER", checker.c_str(), 1);
-
-    AppState app(temporary.path / "Music", std::make_unique<FakePlayer>());
+    AppState app(temporary.path / "Music", std::make_unique<FakePlayer>(),
+                 updatePaths(appDir, dataDir, checker));
     buildHomeView(app);
     app.view.selected = 3;
 
-    require(requestUpdateCheck(app), "TrimUI update check must start in the background");
+    require(app.updates.check(), "TrimUI update check must start in the background");
     require(app.running, "update checks must keep the app running during network work");
-    require(app.update.checking() && app.update.processId > 0,
-            "update check must expose an active process state");
+    require(app.updates.state().checking(),
+            "update check must expose semantic active state without a process id");
 
     handleKey(app, SDLK_DOWN);
     require(app.view.selected == 3, "update loading modal must block duplicate navigation input");
 
-    for (int attempt = 0; attempt < 100 && app.update.checking(); ++attempt) {
-        pollUpdateCheck(app);
+    for (int attempt = 0; attempt < 100 && app.updates.state().checking(); ++attempt) {
+        if (app.updates.poll()) refreshHomeView(app);
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
-    pollUpdateCheck(app);
+    if (app.updates.poll()) refreshHomeView(app);
 
+    const auto& update = app.updates.state();
     require(app.running, "completed update check must leave Pocket Music open");
-    require(!app.update.checking() && app.update.phase == UpdatePhase::Ready,
+    require(!update.checking() && update.phase == UpdatePhase::Ready,
             "ready checker exit must become an in-app ready state");
-    require(app.update.version == "0.2.5", "ready state must expose the update version");
+    require(update.version == "0.2.5", "ready state must expose the update version");
     require(app.view.items.size() == 5 && app.view.items[4].title == "Install Update" &&
                 app.view.items[4].subtitle == "v0.2.5",
             "completed check must refresh Home with the install action");
     const auto installRow = homeRowPresentation(app.view.items[4]);
     require(installRow.trailing == "v0.2.5" && !installRow.chevron,
             "Install Update must present its pending version as trailing text");
+}
 
-    cancelUpdateCheck(app);
-    unsetenv("POCKET_MUSIC_UPDATE_CHECKER");
-    unsetenv("POCKET_MUSIC_DATA_DIR");
-    unsetenv("POCKET_MUSIC_APP_DIR");
+void updateCancellationIsNonBlocking() {
+    TemporaryDirectory temporary;
+    const auto appDir = temporary.path / "PocketMusic";
+    const auto dataDir = appDir / "data";
+    const auto checker = appDir / "update" / "check-update.sh";
+    fs::create_directories(checker.parent_path());
+    {
+        std::ofstream script(checker);
+        script << "#!/bin/sh\n"
+                  "trap '' TERM\n"
+                  "mkdir -p \"$3/update\"\n"
+                  "printf 'phase=checking\\n' > \"$3/update/check-phase\"\n"
+                  "while :; do sleep 1; done\n";
+    }
+    makeExecutable(checker);
+
+    AppState app(temporary.path / "Music", std::make_unique<FakePlayer>(),
+                 updatePaths(appDir, dataDir, checker));
+    buildHomeView(app);
+    app.view.selected = 3;
+    require(app.updates.check(), "cancellation fixture must start checker");
+
+    const auto started = std::chrono::steady_clock::now();
+    handleKey(app, SDLK_b);
+    const auto elapsed = std::chrono::steady_clock::now() - started;
+    require(elapsed < std::chrono::milliseconds(200),
+            "cancel input must not block waiting for the checker process");
+    require(app.updates.state().cancelling() && !app.updates.state().cancellable(),
+            "cancel must enter a non-cancellable semantic cancelling state");
+
+    for (int attempt = 0; attempt < 150 && app.updates.state().cancelling(); ++attempt) {
+        app.updates.poll();
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    app.updates.poll();
+    require(app.updates.state().phase == UpdatePhase::Idle,
+            "poll must reap a cancelled checker and return to idle");
+    require(!fs::exists(dataDir / "update" / "check-phase"),
+            "cancelled checker phase file must be cleared after reap");
 }
 
 void pendingUpdateRequiresExplicitInstallAction() {
     TemporaryDirectory temporary;
-    const auto dataDir = temporary.path / "data";
+    const auto appDir = temporary.path / "PocketMusic";
+    const auto dataDir = appDir / "data";
+    const auto checker = appDir / "update" / "check-update.sh";
     fs::create_directories(dataDir / "update");
     {
         std::ofstream pending(dataDir / "update" / "pending-update");
         pending << "version=0.2.5\nasset=test.tar.gz\nsha256=abc\n";
     }
 
-    setenv("POCKET_MUSIC_DATA_DIR", dataDir.c_str(), 1);
-    AppState app(temporary.path / "Music", std::make_unique<FakePlayer>());
+    AppState app(temporary.path / "Music", std::make_unique<FakePlayer>(),
+                 updatePaths(appDir, dataDir, checker));
     buildHomeView(app);
 
     require(app.view.items.size() == 5, "pending update must add an explicit install destination");
     require(app.view.items[4].title == "Install Update" && app.view.items[4].subtitle == "v0.2.5",
             "pending update must show the version before installation");
     app.view.selected = 4;
-    require(requestUpdateInstall(app), "install action must create a launcher request");
+    require(app.updates.requestInstall(), "install action must create a launcher request");
     require(app.running, "install request must stay alive until the install modal is presented");
-    require(app.update.phase == UpdatePhase::PreparingInstall && app.update.modalVisible(),
+    const auto& update = app.updates.state();
+    require(update.phase == UpdatePhase::PreparingInstall && update.modalVisible(),
             "install request must enter the modal handoff state");
-    require(app.update.version == "0.2.5", "install handoff must preserve the pending version");
+    require(update.version == "0.2.5", "install handoff must preserve the pending version");
     require(fs::exists(dataDir / "update" / "install-requested"),
             "install request marker must be persisted before shutdown");
 
@@ -192,49 +237,52 @@ void pendingUpdateRequiresExplicitInstallAction() {
     require(app.view.selected == 4, "install handoff modal must block navigation input");
 
     finishDeferredUpdateHandoff(app);
-    unsetenv("POCKET_MUSIC_DATA_DIR");
     require(!app.running, "install handoff must stop the app only after the render boundary");
 }
 
 void updateInstallRequiresPendingUpdate() {
     TemporaryDirectory temporary;
-    const auto dataDir = temporary.path / "data";
-    setenv("POCKET_MUSIC_DATA_DIR", dataDir.c_str(), 1);
-    AppState app(temporary.path / "Music", std::make_unique<FakePlayer>());
+    const auto appDir = temporary.path / "PocketMusic";
+    const auto dataDir = appDir / "data";
+    const auto checker = appDir / "update" / "check-update.sh";
+    AppState app(temporary.path / "Music", std::make_unique<FakePlayer>(),
+                 updatePaths(appDir, dataDir, checker));
 
-    require(!requestUpdateInstall(app), "install must refuse when no verified update is pending");
-    unsetenv("POCKET_MUSIC_DATA_DIR");
+    require(!app.updates.requestInstall(), "install must refuse when no verified update is pending");
     require(app.running, "refused install must keep the app running");
-    require(app.update.phase == UpdatePhase::Error && !app.update.detail.empty(),
+    require(app.updates.state().phase == UpdatePhase::Error && !app.updates.state().detail.empty(),
             "refused install must explain failure through update state");
     require(app.message.empty(), "update failures must not share the playback message channel");
 }
 
 void updateStatusIsIndependentFromPlaybackMessages() {
     TemporaryDirectory temporary;
-    AppState app(temporary.path / "Music", std::make_unique<FakePlayer>());
-    app.update.phase = UpdatePhase::Result;
-    app.update.detail = "Pocket Music updated to 0.2.5";
+    const auto appDir = temporary.path / "PocketMusic";
+    const auto dataDir = appDir / "data";
+    const auto checker = appDir / "update" / "check-update.sh";
+    fs::create_directories(dataDir / "update");
+    std::ofstream(dataDir / "update" / "last-status") << "Pocket Music updated to 0.2.5\n";
+
+    AppState app(temporary.path / "Music", std::make_unique<FakePlayer>(),
+                 updatePaths(appDir, dataDir, checker));
+    require(app.updates.consumeLastStatus(), "update status fixture must be consumed");
     app.message = "temporary playback message";
 
     advanceWhenFinished(app);
 
-    require(app.update.phase == UpdatePhase::Result,
+    require(app.updates.state().phase == UpdatePhase::Result,
             "playback updates must not mutate the updater lifecycle");
-    require(app.update.detail == "Pocket Music updated to 0.2.5",
+    require(app.updates.state().detail == "Pocket Music updated to 0.2.5",
             "playback updates must not clear updater results");
 }
 
 void updateCheckIsTrimuiOnly() {
     TemporaryDirectory temporary;
     AppState app(temporary.path / "Music", std::make_unique<FakePlayer>());
-    unsetenv("POCKET_MUSIC_APP_DIR");
-    unsetenv("POCKET_MUSIC_DATA_DIR");
-    unsetenv("POCKET_MUSIC_UPDATE_CHECKER");
 
-    require(!requestUpdateCheck(app), "desktop update check must not attempt TrimUI update flow");
+    require(!app.updates.check(), "desktop update check must not attempt TrimUI update flow");
     require(app.running, "unsupported update check must keep the app running");
-    require(app.update.phase == UpdatePhase::Error && !app.update.detail.empty(),
+    require(app.updates.state().phase == UpdatePhase::Error && !app.updates.state().detail.empty(),
             "unsupported update check must report through update state");
 }
 
@@ -346,6 +394,7 @@ void addNavigationTests(TestCases& tests) {
     tests.emplace_back("Home primary destinations", homeRowsExposePrimaryDestinations);
     tests.emplace_back("semantic presentation mappings", presentationMappingsAreSemantic);
     tests.emplace_back("update check runs inside app", updateCheckRunsInsideApp);
+    tests.emplace_back("update cancellation is nonblocking", updateCancellationIsNonBlocking);
     tests.emplace_back("pending update requires explicit install",
                        pendingUpdateRequiresExplicitInstallAction);
     tests.emplace_back("update install requires pending update",

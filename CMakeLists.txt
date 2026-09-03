@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(pocket_music VERSION 0.2.5 LANGUAGES CXX)
+project(pocket_music VERSION 0.2.6 LANGUAGES CXX)
 
 option(POCKET_MUSIC_TRIMUI "Build for TrimUI Stock OS" OFF)
 

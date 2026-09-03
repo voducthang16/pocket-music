@@ -69,34 +69,35 @@ std::optional<std::string> pendingUpdateVersion() {
     return std::nullopt;
 }
 
-bool writeUpdateRequest(AppState& app, const char* filename, const char* successMessage) {
+bool writeUpdateMarker(AppState& app, const char* filename) {
     const auto updateDir = updateDirectory();
     if (!updateDir) {
-        app.message = "Remote updates are available on TrimUI";
+        app.update.phase = UpdatePhase::Error;
+        app.update.detail = "Remote updates are available on TrimUI";
         return false;
     }
 
     std::error_code error;
     std::filesystem::create_directories(*updateDir, error);
     if (error) {
-        app.message = "Could not prepare update directory";
+        app.update.phase = UpdatePhase::Error;
+        app.update.detail = "Could not prepare update directory";
         return false;
     }
 
     std::ofstream request(*updateDir / filename, std::ios::trunc);
     if (!request) {
-        app.message = "Could not request update action";
+        app.update.phase = UpdatePhase::Error;
+        app.update.detail = "Could not request update action";
         return false;
     }
     request << "requested\n";
     request.close();
     if (!request) {
-        app.message = "Could not save update request";
+        app.update.phase = UpdatePhase::Error;
+        app.update.detail = "Could not save update request";
         return false;
     }
-
-    app.message = successMessage;
-    app.running = false;
     return true;
 }
 
@@ -137,18 +138,17 @@ void readCheckPhase(AppState& app) {
             version = line.substr(8);
     }
 
-    if (!version.empty()) app.updateCheck.version = version;
+    if (!version.empty()) app.update.version = version;
     if (phase == "downloading") {
-        app.updateCheck.phase = UpdateCheckPhase::Downloading;
-        app.updateCheck.detail = app.updateCheck.version.empty()
-                                     ? "Downloading update..."
-                                     : "Downloading v" + app.updateCheck.version + "...";
+        app.update.phase = UpdatePhase::Downloading;
+        app.update.detail = app.update.version.empty() ? "Downloading update..."
+                                                       : "Downloading v" + app.update.version + "...";
     } else if (phase == "verifying") {
-        app.updateCheck.phase = UpdateCheckPhase::Verifying;
-        app.updateCheck.detail = "Verifying update...";
+        app.update.phase = UpdatePhase::Verifying;
+        app.update.detail = "Verifying update...";
     } else if (phase == "checking") {
-        app.updateCheck.phase = UpdateCheckPhase::Checking;
-        app.updateCheck.detail = "Looking for a new version...";
+        app.update.phase = UpdatePhase::Checking;
+        app.update.detail = "Looking for a new version...";
     }
 }
 
@@ -191,22 +191,23 @@ void playAdjacentTrack(AppState& app, int direction) {
 }
 
 bool requestUpdateCheck(AppState& app) {
-    if (app.updateCheck.active()) return false;
+    if (app.update.checking() || app.update.preparingInstall()) return false;
 
     const auto appDir = appDirectory();
     const auto dataDir = dataDirectory();
     const auto updateDir = updateDirectory();
     const auto checker = updateChecker();
     if (!appDir || !dataDir || !updateDir || !checker) {
-        app.message = "Remote updates are available on TrimUI";
+        app.update.phase = UpdatePhase::Error;
+        app.update.detail = "Remote updates are available on TrimUI";
         return false;
     }
 
     std::error_code error;
     std::filesystem::create_directories(*updateDir, error);
     if (error || access(checker->c_str(), X_OK) != 0) {
-        app.updateCheck.phase = UpdateCheckPhase::Error;
-        app.updateCheck.detail = "Pocket Music updater is unavailable";
+        app.update.phase = UpdatePhase::Error;
+        app.update.detail = "Pocket Music updater is unavailable";
         return false;
     }
     clearCheckPhaseFile();
@@ -214,8 +215,8 @@ bool requestUpdateCheck(AppState& app) {
     const auto logPath = *updateDir / "update.log";
     const pid_t pid = fork();
     if (pid < 0) {
-        app.updateCheck.phase = UpdateCheckPhase::Error;
-        app.updateCheck.detail = "Could not start update check";
+        app.update.phase = UpdatePhase::Error;
+        app.update.detail = "Could not start update check";
         return false;
     }
 
@@ -234,73 +235,90 @@ bool requestUpdateCheck(AppState& app) {
 
     setpgid(pid, pid);
     app.message.clear();
-    app.updateCheck.phase = UpdateCheckPhase::Checking;
-    app.updateCheck.processId = static_cast<int>(pid);
-    app.updateCheck.version.clear();
-    app.updateCheck.detail = "Looking for a new version...";
+    app.update.phase = UpdatePhase::Checking;
+    app.update.processId = static_cast<int>(pid);
+    app.update.version.clear();
+    app.update.detail = "Looking for a new version...";
     return true;
 }
 
 void pollUpdateCheck(AppState& app) {
-    if (!app.updateCheck.active() || app.updateCheck.processId <= 0) return;
+    if (!app.update.checking() || app.update.processId <= 0) return;
 
     readCheckPhase(app);
 
     int status = 0;
-    const pid_t pid = static_cast<pid_t>(app.updateCheck.processId);
+    const pid_t pid = static_cast<pid_t>(app.update.processId);
     const pid_t result = waitpid(pid, &status, WNOHANG);
     if (result == 0) return;
 
-    app.updateCheck.processId = -1;
+    app.update.processId = -1;
     clearCheckPhaseFile();
 
     if (result < 0) {
-        app.updateCheck.phase = UpdateCheckPhase::Error;
-        app.updateCheck.detail = "Couldn't check for updates. Try again.";
+        app.update.phase = UpdatePhase::Error;
+        app.update.detail = "Couldn't check for updates. Try again.";
         refreshHomeView(app);
         return;
     }
 
     const int exitCode = WIFEXITED(status) ? WEXITSTATUS(status) : 2;
     if (exitCode == 0) {
-        app.updateCheck.phase = UpdateCheckPhase::UpToDate;
-        app.updateCheck.version.clear();
-        app.updateCheck.detail = "Pocket Music is up to date";
+        app.update.phase = UpdatePhase::UpToDate;
+        app.update.version.clear();
+        app.update.detail = "Pocket Music is up to date";
     } else if (exitCode == 10) {
-        app.updateCheck.phase = UpdateCheckPhase::Ready;
-        if (const auto version = pendingUpdateVersion()) app.updateCheck.version = *version;
-        app.updateCheck.detail = app.updateCheck.version.empty()
-                                     ? "Update is ready to install"
-                                     : "v" + app.updateCheck.version + " is ready to install";
+        app.update.phase = UpdatePhase::Ready;
+        if (const auto version = pendingUpdateVersion()) app.update.version = *version;
+        app.update.detail = app.update.version.empty() ? "Update is ready to install"
+                                                       : "v" + app.update.version + " is ready to install";
     } else {
-        app.updateCheck.phase = UpdateCheckPhase::Error;
-        app.updateCheck.detail = "Couldn't check for updates. Check your Wi-Fi and try again.";
+        app.update.phase = UpdatePhase::Error;
+        app.update.detail = "Couldn't check for updates. Check your Wi-Fi and try again.";
     }
     refreshHomeView(app);
 }
 
 void cancelUpdateCheck(AppState& app) {
-    if (app.updateCheck.processId > 0) {
-        const pid_t pid = static_cast<pid_t>(app.updateCheck.processId);
+    if (app.update.processId > 0 && app.update.checking()) {
+        const pid_t pid = static_cast<pid_t>(app.update.processId);
         kill(-pid, SIGTERM);
         waitpid(pid, nullptr, 0);
     }
-    app.updateCheck.processId = -1;
-    if (app.updateCheck.active()) app.updateCheck.phase = UpdateCheckPhase::Idle;
+    app.update.processId = -1;
+    if (app.update.checking()) app.update.phase = UpdatePhase::Idle;
     clearCheckPhaseFile();
 }
 
 bool requestUpdateInstall(AppState& app) {
+    if (app.update.checking() || app.update.preparingInstall()) return false;
+
     const auto updateDir = updateDirectory();
     if (!updateDir) {
-        app.message = "Remote updates are available on TrimUI";
+        app.update.phase = UpdatePhase::Error;
+        app.update.detail = "Remote updates are available on TrimUI";
         return false;
     }
     if (!std::filesystem::exists(*updateDir / "pending-update")) {
-        app.message = "No update is ready to install";
+        app.update.phase = UpdatePhase::Error;
+        app.update.detail = "No update is ready to install";
         return false;
     }
-    return writeUpdateRequest(app, "install-requested", "Installing update...");
+
+    const auto version = pendingUpdateVersion();
+    if (!writeUpdateMarker(app, "install-requested")) return false;
+
+    app.message.clear();
+    app.update.phase = UpdatePhase::PreparingInstall;
+    app.update.processId = -1;
+    app.update.version = version.value_or("");
+    app.update.detail = app.update.version.empty() ? "Pocket Music will restart..."
+                                                   : "Installing v" + app.update.version + "...";
+    return true;
+}
+
+void finishDeferredUpdateHandoff(AppState& app) {
+    if (app.update.preparingInstall()) app.running = false;
 }
 
 void selectCurrentItem(AppState& app) {

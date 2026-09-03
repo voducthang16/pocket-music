@@ -26,8 +26,8 @@ void drawUpdateSpinner(AppState& app, int centerX, int centerY, Uint64 now) {
     }
 }
 
-void drawUpdateCheckModal(AppState& app, Uint64 now) {
-    if (!app.updateCheck.active()) return;
+void drawUpdateModal(AppState& app, Uint64 now) {
+    if (!app.update.modalVisible()) return;
 
     SDL_Color dim = app.theme.text;
     dim.a = 44;
@@ -40,17 +40,21 @@ void drawUpdateCheckModal(AppState& app, Uint64 now) {
 
     const int centerX = card.x + card.w / 2;
     drawUpdateSpinner(app, centerX, card.y + 55, now);
-    drawText(app.renderer, app.bodyFont, "Checking for Updates", centerX, card.y + 91,
-             app.theme.text, card.w - 64, true);
-    drawText(app.renderer, app.smallFont, app.updateCheck.detail, centerX, card.y + 139,
+
+    const bool installing = app.update.preparingInstall();
+    const std::string title = installing ? "Installing Update" : "Checking for Updates";
+    drawText(app.renderer, app.bodyFont, title, centerX, card.y + 91, app.theme.text, card.w - 64,
+             true);
+    drawText(app.renderer, app.smallFont, app.update.detail, centerX, card.y + 139,
              app.theme.accent, card.w - 64, true);
-    drawText(app.renderer, app.smallFont, "B / Back to cancel", centerX, card.y + 172,
-             app.theme.textMuted, card.w - 64, true);
+    drawText(app.renderer, app.smallFont,
+             installing ? "Please don't power off" : "B / Back to cancel", centerX,
+             card.y + 172, app.theme.textMuted, card.w - 64, true);
 }
 
 std::string updateResultMessage(const AppState& app) {
-    if (app.updateCheck.active() || app.updateCheck.phase == UpdateCheckPhase::Idle) return {};
-    return app.updateCheck.detail;
+    if (app.update.modalVisible() || app.update.phase == UpdatePhase::Idle) return {};
+    return app.update.detail;
 }
 }  // namespace
 
@@ -76,7 +80,7 @@ void renderApp(AppState& app) {
 
     const std::string updateMessage = updateResultMessage(app);
     const std::string& bannerMessage = updateMessage.empty() ? app.message : updateMessage;
-    if (!bannerMessage.empty() && app.view.screen != Screen::NowPlaying && !app.updateCheck.active()) {
+    if (!bannerMessage.empty() && app.view.screen != Screen::NowPlaying && !app.update.modalVisible()) {
         const SDL_Rect banner{layout::messageBannerX, layout::messageBannerY,
                               layout::messageBannerWidth, layout::messageBannerHeight};
         SDL_Color surface = app.theme.surfaceRaised;
@@ -87,6 +91,6 @@ void renderApp(AppState& app) {
     }
     if (app.exitConfirmationOpen) drawExitConfirmation(app);
     drawButtonHints(app);
-    drawUpdateCheckModal(app, now);
+    drawUpdateModal(app, now);
     SDL_RenderPresent(app.renderer);
 }

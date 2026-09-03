@@ -117,8 +117,8 @@ bool UpdateController::check() {
     if (error == 0) {
         actionsReady = true;
         const auto logPath = updateDir / "update.log";
-        error = posix_spawn_file_actions_addopen(
-            &actions, STDOUT_FILENO, logPath.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        error = posix_spawn_file_actions_addopen(&actions, STDOUT_FILENO, logPath.c_str(),
+                                                 O_WRONLY | O_CREAT | O_TRUNC, 0644);
         if (error == 0)
             error = posix_spawn_file_actions_adddup2(&actions, STDOUT_FILENO, STDERR_FILENO);
     }
@@ -127,8 +127,7 @@ bool UpdateController::check() {
         if (error == 0) {
             attributesReady = true;
             error = posix_spawnattr_setpgroup(&attributes, 0);
-            if (error == 0)
-                error = posix_spawnattr_setflags(&attributes, POSIX_SPAWN_SETPGROUP);
+            if (error == 0) error = posix_spawnattr_setflags(&attributes, POSIX_SPAWN_SETPGROUP);
         }
     }
     if (error != 0) {
@@ -142,8 +141,7 @@ bool UpdateController::check() {
     const std::string appDir = paths_.appDir.string();
     const std::string dataDir = paths_.dataDir.string();
     char* arguments[] = {const_cast<char*>(preparer.c_str()),
-                         const_cast<char*>(POCKET_MUSIC_VERSION),
-                         const_cast<char*>(appDir.c_str()),
+                         const_cast<char*>(POCKET_MUSIC_VERSION), const_cast<char*>(appDir.c_str()),
                          const_cast<char*>(dataDir.c_str()), nullptr};
 
     pid_t pid = -1;
@@ -203,7 +201,8 @@ bool UpdateController::poll() {
     } else if (exitCode == 10) {
         const auto version = pendingVersion();
         resetIdle();
-        emitNotice(version ? "v" + *version + " is ready to install" : "Update is ready to install");
+        emitNotice(version ? "v" + *version + " is ready to install"
+                           : "Update is ready to install");
     } else {
         resetIdle();
         emitNotice("Couldn't check for updates. Check Wi-Fi and try again.");

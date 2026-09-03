@@ -44,14 +44,14 @@ void drawUpdateModal(AppState& app, Uint64 now) {
 
     const bool installing = update.preparingInstall();
     const bool cancelling = update.cancelling();
-    const std::string title = installing ? "Installing Update"
+    const std::string title = installing   ? "Installing Update"
                               : cancelling ? "Cancelling Update"
                                            : "Checking for Updates";
     drawText(app.renderer, app.bodyFont, title, centerX, card.y + 91, app.theme.text, card.w - 64,
              true);
     drawText(app.renderer, app.smallFont, update.detail, centerX, card.y + 139, app.theme.accent,
              card.w - 64, true);
-    const std::string hint = installing ? "Please don't power off"
+    const std::string hint = installing   ? "Please don't power off"
                              : cancelling ? "Please wait"
                                           : "B  Cancel";
     drawText(app.renderer, app.smallFont, hint, centerX, card.y + 172, app.theme.textMuted,

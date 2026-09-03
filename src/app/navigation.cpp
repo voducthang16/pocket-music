@@ -129,7 +129,8 @@ void advanceWhenFinished(AppState& app) {
         if (!app.notice || app.notice->source == NoticeSource::Playback)
             app.notice = AppNotice{NoticeSource::Playback, playback.errorMessage};
     } else if ((playback.phase == PlaybackPhase::Loading ||
-                playback.phase == PlaybackPhase::Playing || playback.phase == PlaybackPhase::Paused) &&
+                playback.phase == PlaybackPhase::Playing ||
+                playback.phase == PlaybackPhase::Paused) &&
                app.notice && app.notice->source == NoticeSource::Playback) {
         app.notice.reset();
     }

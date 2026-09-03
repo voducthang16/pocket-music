@@ -250,7 +250,8 @@ void updateInstallRequiresPendingUpdate() {
     AppState app(temporary.path / "Music", std::make_unique<FakePlayer>(),
                  updatePaths(appDir, dataDir, preparer));
 
-    require(!app.updates.requestInstall(), "install must refuse when no verified update is pending");
+    require(!app.updates.requestInstall(),
+            "install must refuse when no verified update is pending");
     require(app.running, "refused install must keep the app running");
     require(app.updates.state().phase == UpdatePhase::Idle,
             "refused install must not invent a persistent updater error state");

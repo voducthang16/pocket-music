@@ -72,9 +72,10 @@ struct AppState {
     std::map<std::string, SDL_Texture*> coverCache;
     std::vector<SDL_GameController*> controllers;
 
-    explicit AppState(std::filesystem::path path,
-                      std::unique_ptr<AudioPlayer> audioPlayer = std::make_unique<FfmpegSdlPlayer>(),
-                      UpdateRuntimePaths updatePaths = {})
+    explicit AppState(
+        std::filesystem::path path,
+        std::unique_ptr<AudioPlayer> audioPlayer = std::make_unique<FfmpegSdlPlayer>(),
+        UpdateRuntimePaths updatePaths = {})
         : library(std::move(path)),
           playback(library, std::move(audioPlayer)),
           updates(std::move(updatePaths)) {}

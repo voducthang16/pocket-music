@@ -1,14 +1,15 @@
 #include "app/navigation.hpp"
 
-#include <algorithm>
-#include <cstdlib>
 #include <fcntl.h>
-#include <fstream>
 #include <signal.h>
-#include <string>
-#include <system_error>
 #include <sys/wait.h>
 #include <unistd.h>
+
+#include <algorithm>
+#include <cstdlib>
+#include <fstream>
+#include <string>
+#include <system_error>
 
 namespace {
 ViewItem trackItem(const Track& track, size_t index) {
@@ -140,8 +141,9 @@ void readCheckPhase(AppState& app) {
     if (!version.empty()) app.update.version = version;
     if (phase == "downloading") {
         app.update.phase = UpdatePhase::Downloading;
-        app.update.detail = app.update.version.empty() ? "Downloading update..."
-                                                       : "Downloading v" + app.update.version + "...";
+        app.update.detail = app.update.version.empty()
+                                ? "Downloading update..."
+                                : "Downloading v" + app.update.version + "...";
     } else if (phase == "verifying") {
         app.update.phase = UpdatePhase::Verifying;
         app.update.detail = "Verifying update...";
@@ -269,8 +271,9 @@ void pollUpdateCheck(AppState& app) {
     } else if (exitCode == 10) {
         app.update.phase = UpdatePhase::Ready;
         if (const auto version = pendingUpdateVersion()) app.update.version = *version;
-        app.update.detail = app.update.version.empty() ? "Update is ready to install"
-                                                       : "v" + app.update.version + " is ready to install";
+        app.update.detail = app.update.version.empty()
+                                ? "Update is ready to install"
+                                : "v" + app.update.version + " is ready to install";
     } else {
         app.update.phase = UpdatePhase::Error;
         app.update.detail = "Couldn't check for updates. Check Wi-Fi and try again.";

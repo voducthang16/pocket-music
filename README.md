@@ -118,20 +118,34 @@ The package is written to `build/trimui/PocketMusic/`. Copy that `PocketMusic` d
 - stores playback state in `Apps/PocketMusic/data`
 - writes runtime output to `/mnt/SDCARD/pocket-music.log`
 - uses SDL libraries supplied by Stock OS
+- handles verified remote update checks and transactional installs after the app exits
 
 The package cross-compiles as AArch64 C++17 and statically links the pinned FFmpeg and TagLib
-builds. The macOS build uses C++20. Invalid playback state falls back safely to defaults.
+builds. It also includes a CA certificate bundle for HTTPS downloads because TrimUI Stock OS may
+not provide one. The macOS build uses C++20. Invalid playback state falls back safely to defaults.
 
-Pushing a tag matching the CMake project version, such as `v0.1.0`, builds
-`PocketMusic-v0.1.0.zip` and publishes it to GitHub Releases.
+Pushing a tag matching the CMake project version, such as `v0.2.2`, publishes the full install ZIP,
+a verified update archive, and update metadata to GitHub Releases.
+
+### Remote updates
+
+From Home, select `Check for Update`. Pocket Music exits before performing network work, downloads
+the latest release metadata and archive over verified HTTPS, then checks the archive size and
+SHA-256 checksum. If a newer version is ready, Home shows `Install Update` with its version. The
+install preserves `Apps/PocketMusic/data`, replaces the application transactionally, and restores
+the previous installation if an interrupted update is detected.
+
+Installations from before `v0.2.2` may need one manual reinstall or SSH bootstrap because those
+packages did not include the CA bundle required by some Stock OS images. Once `v0.2.2` or newer is
+installed, the CA bundle and updater are carried forward by subsequent update archives.
 
 Runtime artwork is limited to `background-hello-kitty-v6.png`, `fallback-vinyl.png`, `icon.png`,
 and the bundled Noto Sans font. `app-icon-source.png` is retained as the editable source for future
 icon exports.
 
-Native FFmpeg/SDL playback, Home/Songs navigation, controller input, and paused session restore have
-been exercised on the TrimUI Brick Hammer. Suspend/resume behavior and every Stock OS firmware
-revision are not covered by automated tests.
+Native FFmpeg/SDL playback, Home/Songs navigation, controller input, paused session restore, and an
+HTTPS OTA update from `v0.2.0` to `v0.2.2` have been exercised on the TrimUI Brick Hammer.
+Suspend/resume behavior and every Stock OS firmware revision are not covered by automated tests.
 
 ## Verification
 
@@ -143,7 +157,7 @@ CTest runs:
 
 - unit tests for scanning, navigation, input mapping, queue policies, persistence,
   theme/layout primitives, and playback lifecycle
-- a smoke scan against `Music/`
+- a smoke scan against a generated empty music directory
 - an FFmpeg/SDL integration test with a generated WAV and SDL's dummy audio driver
 
 Verify the target build separately with `make trimui-package`. Physical display, controls,

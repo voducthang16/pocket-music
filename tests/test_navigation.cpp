@@ -1,6 +1,8 @@
+#include <chrono>
 #include <cstdlib>
 #include <fstream>
 #include <memory>
+#include <thread>
 
 #include "app/app_state.hpp"
 #include "app/navigation.hpp"
@@ -73,19 +75,61 @@ void homeRowsExposePrimaryDestinations() {
             "Home must expose remote update checks");
 }
 
-void updateCheckRequestsLauncherWork() {
+void updateCheckRunsInsideApp() {
     TemporaryDirectory temporary;
-    const auto dataDir = temporary.path / "data";
+    const auto appDir = temporary.path / "PocketMusic";
+    const auto dataDir = appDir / "data";
+    const auto checker = appDir / "update" / "check-update.sh";
+    fs::create_directories(checker.parent_path());
+    {
+        std::ofstream script(checker);
+        script << "#!/bin/sh\n"
+                  "mkdir -p \"$3/update\"\n"
+                  "printf 'phase=downloading\\nversion=0.2.3\\n' > \"$3/update/check-phase\"\n"
+                  "sleep 0.05\n"
+                  "printf 'phase=verifying\\nversion=0.2.3\\n' > \"$3/update/check-phase\"\n"
+                  "printf 'version=0.2.3\\nasset=test.tar.gz\\nsha256=abc\\n' > "
+                  "\"$3/update/pending-update\"\n"
+                  "exit 10\n";
+    }
+    fs::permissions(checker,
+                    fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec,
+                    fs::perm_options::add);
+
+    setenv("POCKET_MUSIC_APP_DIR", appDir.c_str(), 1);
+    setenv("POCKET_MUSIC_DATA_DIR", dataDir.c_str(), 1);
+    setenv("POCKET_MUSIC_UPDATE_CHECKER", checker.c_str(), 1);
+
     AppState app(temporary.path / "Music", std::make_unique<FakePlayer>());
     buildHomeView(app);
+    app.view.selected = 3;
 
-    setenv("POCKET_MUSIC_DATA_DIR", dataDir.c_str(), 1);
-    require(requestUpdateCheck(app), "TrimUI update check must create a launcher request");
+    require(requestUpdateCheck(app), "TrimUI update check must start in the background");
+    require(app.running, "update checks must keep the app running during network work");
+    require(app.updateCheck.active() && app.updateCheck.processId > 0,
+            "update check must expose an active process state");
+
+    handleKey(app, SDLK_DOWN);
+    require(app.view.selected == 3, "update loading modal must block duplicate navigation input");
+
+    for (int attempt = 0; attempt < 100 && app.updateCheck.active(); ++attempt) {
+        pollUpdateCheck(app);
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    pollUpdateCheck(app);
+
+    require(app.running, "completed update check must leave Pocket Music open");
+    require(!app.updateCheck.active() && app.updateCheck.phase == UpdateCheckPhase::Ready,
+            "ready checker exit must become an in-app ready state");
+    require(app.updateCheck.version == "0.2.3", "ready state must expose the update version");
+    require(app.view.items.size() == 5 && app.view.items[4].title == "Install Update" &&
+                app.view.items[4].subtitle == "v0.2.3",
+            "completed check must refresh Home with the install action");
+
+    cancelUpdateCheck(app);
+    unsetenv("POCKET_MUSIC_UPDATE_CHECKER");
     unsetenv("POCKET_MUSIC_DATA_DIR");
-
-    require(!app.running, "update checks must shut the app down cleanly before network work");
-    require(fs::exists(dataDir / "update" / "check-requested"),
-            "update check request marker must be persisted");
+    unsetenv("POCKET_MUSIC_APP_DIR");
 }
 
 void pendingUpdateRequiresExplicitInstallAction() {
@@ -127,7 +171,9 @@ void updateInstallRequiresPendingUpdate() {
 void updateCheckIsTrimuiOnly() {
     TemporaryDirectory temporary;
     AppState app(temporary.path / "Music", std::make_unique<FakePlayer>());
+    unsetenv("POCKET_MUSIC_APP_DIR");
     unsetenv("POCKET_MUSIC_DATA_DIR");
+    unsetenv("POCKET_MUSIC_UPDATE_CHECKER");
 
     require(!requestUpdateCheck(app), "desktop update check must not attempt TrimUI update flow");
     require(app.running, "unsupported update check must keep the app running");
@@ -240,7 +286,7 @@ void addNavigationTests(TestCases& tests) {
     tests.emplace_back("navigation queue", navigationQueue);
     tests.emplace_back("failed load", failedLoad);
     tests.emplace_back("Home primary destinations", homeRowsExposePrimaryDestinations);
-    tests.emplace_back("update check requests launcher work", updateCheckRequestsLauncherWork);
+    tests.emplace_back("update check runs inside app", updateCheckRunsInsideApp);
     tests.emplace_back("pending update requires explicit install",
                        pendingUpdateRequiresExplicitInstallAction);
     tests.emplace_back("update install requires pending update", updateInstallRequiresPendingUpdate);

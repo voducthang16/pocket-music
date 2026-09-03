@@ -39,7 +39,7 @@ jobs:
             libswresample-dev
 
       - name: Validate TrimUI update scripts
-        run: sh -n platform/trimui/launch.sh platform/trimui/update/check-update.sh platform/trimui/update/apply-update.sh tests/test_trimui_update.sh
+        run: sh -n platform/trimui/launch.sh platform/trimui/update/prepare-update.sh platform/trimui/update/apply-update.sh tests/test_trimui_update.sh
 
       - name: Test TrimUI updater
         run: sh tests/test_trimui_update.sh

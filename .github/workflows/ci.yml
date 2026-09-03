@@ -38,3 +38,19 @@ jobs:
 
       - name: Run tests
         run: make test
+
+  trimui-cross-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Build TrimUI AArch64 package
+        run: make trimui-package
+
+      - name: Verify package output
+        run: |
+          test -x build/trimui/PocketMusic/bin/pocket-music
+          test -x build/trimui/PocketMusic/launch.sh
+          test -x build/trimui/PocketMusic/update/check-update.sh
+          file build/trimui/PocketMusic/bin/pocket-music

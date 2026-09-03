@@ -1,7 +1,6 @@
 #include "app/navigation.hpp"
 
 #include <algorithm>
-#include <cerrno>
 #include <cstdlib>
 #include <fcntl.h>
 #include <fstream>

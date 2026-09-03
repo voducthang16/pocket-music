@@ -85,10 +85,10 @@ void updateCheckRunsInsideApp() {
         std::ofstream script(checker);
         script << "#!/bin/sh\n"
                   "mkdir -p \"$3/update\"\n"
-                  "printf 'phase=downloading\\nversion=0.2.3\\n' > \"$3/update/check-phase\"\n"
+                  "printf 'phase=downloading\\nversion=0.2.5\\n' > \"$3/update/check-phase\"\n"
                   "sleep 0.05\n"
-                  "printf 'phase=verifying\\nversion=0.2.3\\n' > \"$3/update/check-phase\"\n"
-                  "printf 'version=0.2.3\\nasset=test.tar.gz\\nsha256=abc\\n' > "
+                  "printf 'phase=verifying\\nversion=0.2.5\\n' > \"$3/update/check-phase\"\n"
+                  "printf 'version=0.2.5\\nasset=test.tar.gz\\nsha256=abc\\n' > "
                   "\"$3/update/pending-update\"\n"
                   "exit 10\n";
     }
@@ -106,24 +106,24 @@ void updateCheckRunsInsideApp() {
 
     require(requestUpdateCheck(app), "TrimUI update check must start in the background");
     require(app.running, "update checks must keep the app running during network work");
-    require(app.updateCheck.active() && app.updateCheck.processId > 0,
+    require(app.update.checking() && app.update.processId > 0,
             "update check must expose an active process state");
 
     handleKey(app, SDLK_DOWN);
     require(app.view.selected == 3, "update loading modal must block duplicate navigation input");
 
-    for (int attempt = 0; attempt < 100 && app.updateCheck.active(); ++attempt) {
+    for (int attempt = 0; attempt < 100 && app.update.checking(); ++attempt) {
         pollUpdateCheck(app);
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     pollUpdateCheck(app);
 
     require(app.running, "completed update check must leave Pocket Music open");
-    require(!app.updateCheck.active() && app.updateCheck.phase == UpdateCheckPhase::Ready,
+    require(!app.update.checking() && app.update.phase == UpdatePhase::Ready,
             "ready checker exit must become an in-app ready state");
-    require(app.updateCheck.version == "0.2.3", "ready state must expose the update version");
+    require(app.update.version == "0.2.5", "ready state must expose the update version");
     require(app.view.items.size() == 5 && app.view.items[4].title == "Install Update" &&
-                app.view.items[4].subtitle == "v0.2.3",
+                app.view.items[4].subtitle == "v0.2.5",
             "completed check must refresh Home with the install action");
 
     cancelUpdateCheck(app);
@@ -138,7 +138,7 @@ void pendingUpdateRequiresExplicitInstallAction() {
     fs::create_directories(dataDir / "update");
     {
         std::ofstream pending(dataDir / "update" / "pending-update");
-        pending << "version=0.2.0\nasset=test.tar.gz\nsha256=abc\n";
+        pending << "version=0.2.5\nasset=test.tar.gz\nsha256=abc\n";
     }
 
     setenv("POCKET_MUSIC_DATA_DIR", dataDir.c_str(), 1);
@@ -146,14 +146,23 @@ void pendingUpdateRequiresExplicitInstallAction() {
     buildHomeView(app);
 
     require(app.view.items.size() == 5, "pending update must add an explicit install destination");
-    require(app.view.items[4].title == "Install Update" && app.view.items[4].subtitle == "v0.2.0",
+    require(app.view.items[4].title == "Install Update" && app.view.items[4].subtitle == "v0.2.5",
             "pending update must show the version before installation");
+    app.view.selected = 4;
     require(requestUpdateInstall(app), "install action must create a launcher request");
-    unsetenv("POCKET_MUSIC_DATA_DIR");
-
-    require(!app.running, "install action must shut the app down before replacing files");
+    require(app.running, "install request must stay alive until the install modal is presented");
+    require(app.update.phase == UpdatePhase::PreparingInstall && app.update.modalVisible(),
+            "install request must enter the modal handoff state");
+    require(app.update.version == "0.2.5", "install handoff must preserve the pending version");
     require(fs::exists(dataDir / "update" / "install-requested"),
-            "install request marker must be persisted");
+            "install request marker must be persisted before shutdown");
+
+    handleKey(app, SDLK_DOWN);
+    require(app.view.selected == 4, "install handoff modal must block navigation input");
+
+    finishDeferredUpdateHandoff(app);
+    unsetenv("POCKET_MUSIC_DATA_DIR");
+    require(!app.running, "install handoff must stop the app only after the render boundary");
 }
 
 void updateInstallRequiresPendingUpdate() {
@@ -165,7 +174,24 @@ void updateInstallRequiresPendingUpdate() {
     require(!requestUpdateInstall(app), "install must refuse when no verified update is pending");
     unsetenv("POCKET_MUSIC_DATA_DIR");
     require(app.running, "refused install must keep the app running");
-    require(!app.message.empty(), "refused install must explain why it cannot proceed");
+    require(app.update.phase == UpdatePhase::Error && !app.update.detail.empty(),
+            "refused install must explain failure through update state");
+    require(app.message.empty(), "update failures must not share the playback message channel");
+}
+
+void updateStatusIsIndependentFromPlaybackMessages() {
+    TemporaryDirectory temporary;
+    AppState app(temporary.path / "Music", std::make_unique<FakePlayer>());
+    app.update.phase = UpdatePhase::Result;
+    app.update.detail = "Pocket Music updated to 0.2.5";
+    app.message = "temporary playback message";
+
+    advanceWhenFinished(app);
+
+    require(app.update.phase == UpdatePhase::Result,
+            "playback updates must not mutate the updater lifecycle");
+    require(app.update.detail == "Pocket Music updated to 0.2.5",
+            "playback updates must not clear updater results");
 }
 
 void updateCheckIsTrimuiOnly() {
@@ -177,7 +203,8 @@ void updateCheckIsTrimuiOnly() {
 
     require(!requestUpdateCheck(app), "desktop update check must not attempt TrimUI update flow");
     require(app.running, "unsupported update check must keep the app running");
-    require(!app.message.empty(), "unsupported update check must explain why it is unavailable");
+    require(app.update.phase == UpdatePhase::Error && !app.update.detail.empty(),
+            "unsupported update check must report through update state");
 }
 
 void trimuiFaceButtonMapping() {
@@ -290,6 +317,8 @@ void addNavigationTests(TestCases& tests) {
     tests.emplace_back("pending update requires explicit install",
                        pendingUpdateRequiresExplicitInstallAction);
     tests.emplace_back("update install requires pending update", updateInstallRequiresPendingUpdate);
+    tests.emplace_back("update status is independent from playback",
+                       updateStatusIsIndependentFromPlaybackMessages);
     tests.emplace_back("update check is TrimUI only", updateCheckIsTrimuiOnly);
     tests.emplace_back("TrimUI face button mapping", trimuiFaceButtonMapping);
     tests.emplace_back("TrimUI Select repeat mapping", trimuiSelectCyclesRepeatMode);

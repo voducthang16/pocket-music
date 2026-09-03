@@ -10,9 +10,9 @@
 struct UpdateRuntimePaths {
     std::filesystem::path appDir;
     std::filesystem::path dataDir;
-    std::filesystem::path checker;
+    std::filesystem::path preparer;
 
-    bool available() const { return !appDir.empty() && !dataDir.empty() && !checker.empty(); }
+    bool available() const { return !appDir.empty() && !dataDir.empty() && !preparer.empty(); }
 };
 
 class UpdateController {
@@ -31,11 +31,13 @@ class UpdateController {
     void cancel();
     bool requestInstall();
     bool consumeLastStatus();
+    std::optional<std::string> takeNotice();
     std::optional<std::string> pendingVersion() const;
 
    private:
     std::filesystem::path updateDirectory() const;
-    void setError(std::string detail);
+    void emitNotice(std::string detail);
+    void resetIdle();
     void readCheckPhase();
     void clearCheckPhaseFile() const;
     void resetCancellation();
@@ -43,6 +45,7 @@ class UpdateController {
 
     UpdateRuntimePaths paths_;
     UpdateState state_;
+    std::optional<std::string> notice_;
     int processId_ = -1;
     bool killSent_ = false;
     std::chrono::steady_clock::time_point cancelDeadline_{};

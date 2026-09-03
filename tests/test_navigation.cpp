@@ -93,11 +93,10 @@ void presentationMappingsAreSemantic() {
     const auto error = playbackPresentation(PlaybackPhase::Error);
     require(loading.status == "LOADING" && loading.primaryAction.empty(),
             "loading must not look like active playback");
-    require(playing.status == "PLAYING" && playing.primaryAction == "PAUSE" &&
-                playing.showPauseIcon,
-            "playing must expose the pause action");
-    require(paused.status == "PAUSED" && paused.primaryAction == "PLAY" &&
-                !paused.showPauseIcon,
+    require(
+        playing.status == "PLAYING" && playing.primaryAction == "PAUSE" && playing.showPauseIcon,
+        "playing must expose the pause action");
+    require(paused.status == "PAUSED" && paused.primaryAction == "PLAY" && !paused.showPauseIcon,
             "paused must expose the play action");
     require(finished.status == "FINISHED" && finished.primaryAction.empty(),
             "finished playback must not imply an active transport action");
@@ -122,8 +121,7 @@ void updateCheckRunsInsideApp() {
                   "\"$3/update/pending-update\"\n"
                   "exit 10\n";
     }
-    fs::permissions(checker,
-                    fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec,
+    fs::permissions(checker, fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec,
                     fs::perm_options::add);
 
     setenv("POCKET_MUSIC_APP_DIR", appDir.c_str(), 1);
@@ -350,7 +348,8 @@ void addNavigationTests(TestCases& tests) {
     tests.emplace_back("update check runs inside app", updateCheckRunsInsideApp);
     tests.emplace_back("pending update requires explicit install",
                        pendingUpdateRequiresExplicitInstallAction);
-    tests.emplace_back("update install requires pending update", updateInstallRequiresPendingUpdate);
+    tests.emplace_back("update install requires pending update",
+                       updateInstallRequiresPendingUpdate);
     tests.emplace_back("update status is independent from playback",
                        updateStatusIsIndependentFromPlaybackMessages);
     tests.emplace_back("update check is TrimUI only", updateCheckIsTrimuiOnly);

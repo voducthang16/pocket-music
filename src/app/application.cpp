@@ -45,7 +45,7 @@ SDL_Texture* loadResourceTexture(SDL_Renderer* renderer, const std::filesystem::
 
 void loadUpdateStatus(AppState& app) {
     const char* rawDataDir = std::getenv("POCKET_MUSIC_DATA_DIR");
-    if (!rawDataDir || !*rawDataDir || !app.message.empty()) return;
+    if (!rawDataDir || !*rawDataDir) return;
 
     const std::filesystem::path statusPath =
         std::filesystem::path(rawDataDir) / "update" / "last-status";
@@ -54,7 +54,12 @@ void loadUpdateStatus(AppState& app) {
 
     std::string line;
     std::getline(status, line);
-    if (!line.empty()) app.message = line;
+    if (!line.empty()) {
+        app.update.phase = UpdatePhase::Result;
+        app.update.processId = -1;
+        app.update.version.clear();
+        app.update.detail = line;
+    }
 
     std::error_code error;
     std::filesystem::remove(statusPath, error);
@@ -193,7 +198,8 @@ int runApplication(const std::filesystem::path& musicPath, const std::filesystem
             lastSessionSave = now;
         }
         renderApp(app);
-        SDL_Delay(16);
+        finishDeferredUpdateHandoff(app);
+        if (app.running) SDL_Delay(16);
     }
     cancelUpdateCheck(app);
     persist(app, statePath);

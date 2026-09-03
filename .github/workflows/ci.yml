@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install build dependencies
         run: |
@@ -28,6 +28,9 @@ jobs:
             libavformat-dev \
             libavutil-dev \
             libswresample-dev
+
+      - name: Validate TrimUI scripts
+        run: sh -n platform/trimui/launch.sh platform/trimui/update/check-update.sh platform/trimui/update/apply-update.sh
 
       - name: Run tests
         run: make test

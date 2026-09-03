@@ -57,8 +57,7 @@ void drawExitConfirmation(AppState& app) {
     fillRoundedRect(app.renderer, frame, 22, app.theme.accentSoft);
     SDL_Color panel = app.theme.surface;
     panel.a = 250;
-    fillRoundedRect(app.renderer, {frame.x + 3, frame.y + 3, frame.w - 6, frame.h - 6}, 20,
-                    panel);
+    fillRoundedRect(app.renderer, {frame.x + 3, frame.y + 3, frame.w - 6, frame.h - 6}, 20, panel);
 
     drawText(app.renderer, app.titleFont, "Leave Pocket Music?", layout::width / 2, frame.y + 42,
              app.theme.text, 520, true);

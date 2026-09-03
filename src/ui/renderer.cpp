@@ -27,7 +27,8 @@ void drawUpdateSpinner(AppState& app, int centerX, int centerY, Uint64 now) {
 }
 
 void drawUpdateModal(AppState& app, Uint64 now) {
-    if (!app.update.modalVisible()) return;
+    const auto& update = app.updates.state();
+    if (!update.modalVisible()) return;
 
     SDL_Color dim = app.theme.text;
     dim.a = 44;
@@ -41,19 +42,20 @@ void drawUpdateModal(AppState& app, Uint64 now) {
     const int centerX = card.x + card.w / 2;
     drawUpdateSpinner(app, centerX, card.y + 55, now);
 
-    const bool installing = app.update.preparingInstall();
-    const std::string title = installing ? "Installing Update" : "Checking for Updates";
+    const bool installing = update.preparingInstall();
+    const bool cancelling = update.cancelling();
+    const std::string title = installing   ? "Installing Update"
+                              : cancelling ? "Cancelling Update"
+                                           : "Checking for Updates";
     drawText(app.renderer, app.bodyFont, title, centerX, card.y + 91, app.theme.text, card.w - 64,
              true);
-    drawText(app.renderer, app.smallFont, app.update.detail, centerX, card.y + 139,
-             app.theme.accent, card.w - 64, true);
-    drawText(app.renderer, app.smallFont, installing ? "Please don't power off" : "B  Cancel",
-             centerX, card.y + 172, app.theme.textMuted, card.w - 64, true);
-}
-
-std::string updateResultMessage(const AppState& app) {
-    if (app.update.modalVisible() || app.update.phase == UpdatePhase::Idle) return {};
-    return app.update.detail;
+    drawText(app.renderer, app.smallFont, update.detail, centerX, card.y + 139, app.theme.accent,
+             card.w - 64, true);
+    const std::string hint = installing   ? "Please don't power off"
+                             : cancelling ? "Please wait"
+                                          : "B  Cancel";
+    drawText(app.renderer, app.smallFont, hint, centerX, card.y + 172, app.theme.textMuted,
+             card.w - 64, true);
 }
 }  // namespace
 
@@ -77,16 +79,14 @@ void renderApp(AppState& app) {
     else
         drawSongsScreen(app);
 
-    const std::string updateMessage = updateResultMessage(app);
-    const std::string& bannerMessage = updateMessage.empty() ? app.message : updateMessage;
-    if (!bannerMessage.empty() && app.view.screen != Screen::NowPlaying &&
-        !app.update.modalVisible()) {
+    if (app.notice && !app.notice->text.empty() && app.view.screen != Screen::NowPlaying &&
+        !app.updates.state().modalVisible()) {
         const SDL_Rect banner{layout::messageBannerX, layout::messageBannerY,
                               layout::messageBannerWidth, layout::messageBannerHeight};
         SDL_Color surface = app.theme.surfaceRaised;
         surface.a = 220;
         fillRoundedRect(app.renderer, banner, 12, surface);
-        drawText(app.renderer, app.smallFont, bannerMessage, banner.x + 18, banner.y + 10,
+        drawText(app.renderer, app.smallFont, app.notice->text, banner.x + 18, banner.y + 10,
                  app.theme.accent, banner.w - 36);
     }
     if (app.exitConfirmationOpen) drawExitConfirmation(app);

@@ -2,9 +2,9 @@
 
 #include "app/navigation.hpp"
 void handleKey(AppState& app, SDL_Keycode code) {
-    if (app.update.modalVisible()) {
-        if (app.update.cancellable() && (code == SDLK_ESCAPE || code == SDLK_b))
-            cancelUpdateCheck(app);
+    const auto& update = app.updates.state();
+    if (update.modalVisible()) {
+        if (update.cancellable() && (code == SDLK_ESCAPE || code == SDLK_b)) app.updates.cancel();
         return;
     }
     if (app.exitConfirmationOpen) {

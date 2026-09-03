@@ -1,7 +1,7 @@
 #!/bin/sh
 
 APP_DIR=$(dirname "$0")
-SD_ROOT=/mnt/SDCARD
+SD_ROOT=${POCKET_MUSIC_SD_ROOT:-/mnt/SDCARD}
 DATA_DIR="$APP_DIR/data"
 LOG_FILE="$SD_ROOT/pocket-music.log"
 UPDATE_DIR="$DATA_DIR/update"
@@ -46,7 +46,7 @@ export LD_LIBRARY_PATH="/usr/trimui/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export POCKET_MUSIC_FONT="$APP_DIR/assets/fonts/NotoSans-Regular.ttf"
 export POCKET_MUSIC_APP_DIR="$APP_DIR"
 export POCKET_MUSIC_DATA_DIR="$DATA_DIR"
-export POCKET_MUSIC_UPDATE_CHECKER="$APP_DIR/update/check-update.sh"
+export POCKET_MUSIC_UPDATE_PREPARER="$APP_DIR/update/prepare-update.sh"
 
 "$APP_DIR/bin/pocket-music" \
   --music "$SD_ROOT/Music" \

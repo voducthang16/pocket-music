@@ -3,7 +3,6 @@
 #include <SDL_image.h>
 
 #include <cstdlib>
-#include <fstream>
 #include <iostream>
 #include <string>
 
@@ -38,31 +37,30 @@ std::filesystem::path fontPath() {
 #endif
 }
 
+UpdateRuntimePaths updateRuntimePaths() {
+    UpdateRuntimePaths paths;
+    const char* rawAppDir = std::getenv("POCKET_MUSIC_APP_DIR");
+    const char* rawDataDir = std::getenv("POCKET_MUSIC_DATA_DIR");
+    if (!rawAppDir || !*rawAppDir || !rawDataDir || !*rawDataDir) return paths;
+
+    paths.appDir = rawAppDir;
+    paths.dataDir = rawDataDir;
+    if (const char* rawPreparer = std::getenv("POCKET_MUSIC_UPDATE_PREPARER");
+        rawPreparer && *rawPreparer)
+        paths.preparer = rawPreparer;
+    else
+        paths.preparer = paths.appDir / "update" / "prepare-update.sh";
+    return paths;
+}
+
+void syncUpdateNotice(AppState& app) {
+    if (auto notice = app.updates.takeNotice())
+        app.notice = AppNotice{NoticeSource::Update, std::move(*notice)};
+}
+
 SDL_Texture* loadResourceTexture(SDL_Renderer* renderer, const std::filesystem::path& relative) {
     const auto path = resourcePath(relative);
     return path.empty() ? nullptr : IMG_LoadTexture(renderer, path.c_str());
-}
-
-void loadUpdateStatus(AppState& app) {
-    const char* rawDataDir = std::getenv("POCKET_MUSIC_DATA_DIR");
-    if (!rawDataDir || !*rawDataDir) return;
-
-    const std::filesystem::path statusPath =
-        std::filesystem::path(rawDataDir) / "update" / "last-status";
-    std::ifstream status(statusPath);
-    if (!status) return;
-
-    std::string line;
-    std::getline(status, line);
-    if (!line.empty()) {
-        app.update.phase = UpdatePhase::Result;
-        app.update.processId = -1;
-        app.update.version.clear();
-        app.update.detail = line;
-    }
-
-    std::error_code error;
-    std::filesystem::remove(statusPath, error);
 }
 
 bool initializeUi(AppState& app, bool fullscreen) {
@@ -143,10 +141,10 @@ void destroyUi(AppState& app) {
 
 int runApplication(const std::filesystem::path& musicPath, const std::filesystem::path& statePath,
                    bool fullscreen) {
-    AppState app(musicPath);
+    AppState app(musicPath, std::make_unique<FfmpegSdlPlayer>(), updateRuntimePaths());
     if (!app.library.scan()) {
         std::cerr << "Music scan failed: " << app.library.error() << '\n';
-        app.message = app.library.error();
+        app.notice = AppNotice{NoticeSource::Application, app.library.error()};
     }
     buildHomeView(app);
     if (!initializeUi(app, fullscreen)) {
@@ -154,7 +152,8 @@ int runApplication(const std::filesystem::path& musicPath, const std::filesystem
         destroyUi(app);
         return 1;
     }
-    loadUpdateStatus(app);
+    app.updates.consumeLastStatus();
+    syncUpdateNotice(app);
     restore(app, statePath);
     uint64_t savedRevision = app.playback.revision();
     Uint64 lastSessionSave = SDL_GetTicks64();
@@ -187,7 +186,8 @@ int runApplication(const std::filesystem::path& musicPath, const std::filesystem
             handleControllerButton(app, static_cast<Uint8>(heldButton));
             nextControllerRepeat = SDL_GetTicks64() + 90;
         }
-        pollUpdateCheck(app);
+        if (app.updates.poll()) refreshHomeView(app);
+        syncUpdateNotice(app);
         advanceWhenFinished(app);
         const Uint64 now = SDL_GetTicks64();
         const bool periodicSave =
@@ -201,7 +201,7 @@ int runApplication(const std::filesystem::path& musicPath, const std::filesystem
         finishDeferredUpdateHandoff(app);
         if (app.running) SDL_Delay(16);
     }
-    cancelUpdateCheck(app);
+    app.updates.cancel();
     persist(app, statePath);
     app.playback.shutdown();
     destroyUi(app);

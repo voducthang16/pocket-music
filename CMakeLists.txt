@@ -85,6 +85,7 @@ add_executable(pocket-music
   src/ui/renderer_songs.cpp
   src/ui/theme.cpp
   src/ui/vinyl.cpp
+  src/update/update_controller.cpp
 )
 
 target_include_directories(pocket-music PRIVATE src)
@@ -129,6 +130,7 @@ if(BUILD_TESTING)
     src/ui/input.cpp
     src/ui/theme.cpp
     src/ui/vinyl.cpp
+    src/update/update_controller.cpp
   )
   target_include_directories(pocket-music-tests PRIVATE src)
   target_compile_definitions(pocket-music-tests PRIVATE POCKET_MUSIC_VERSION="${PROJECT_VERSION}")

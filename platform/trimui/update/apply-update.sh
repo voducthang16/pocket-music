@@ -15,6 +15,8 @@ STAGE="$UPDATE_DIR/stage"
 PREPARED="$UPDATE_DIR/prepared"
 BACKUP="$UPDATE_DIR/backup"
 MARKER="$UPDATE_DIR/update-in-progress"
+MANAGED_DIRS="bin assets certs update"
+MANAGED_FILES="icon.png config.json launch.sh"
 SUCCESS=0
 
 field() {
@@ -40,14 +42,14 @@ restore_backup() {
     return 2
   }
 
-  for path in bin assets certs update; do
+  for path in $MANAGED_DIRS; do
     rm -rf "$APP_DIR/$path"
     if [ -e "$BACKUP/$path" ]; then
       cp -Rp "$BACKUP/$path" "$APP_DIR/$path"
     fi
   done
 
-  for path in icon.png config.json launch.sh; do
+  for path in $MANAGED_FILES; do
     if [ -e "$BACKUP/$path" ]; then
       temp="$APP_DIR/.pocket-music-rollback-$path"
       rm -rf "$temp"
@@ -96,14 +98,29 @@ fi
 VERSION=$(field version)
 ASSET=$(field asset)
 SHA256=$(field sha256)
+SIZE=$(field size)
+case "$ASSET" in
+  ''|*/*|*\\*) echo "Pending update asset is invalid" >&2; exit 2 ;;
+esac
+case "$SHA256" in
+  ''|*[!0-9a-fA-F]*) echo "Pending update checksum is invalid" >&2; exit 2 ;;
+esac
+[ "${#SHA256}" -eq 64 ] || {
+  echo "Pending update checksum is invalid" >&2
+  exit 2
+}
+case "$SIZE" in
+  ''|*[!0-9]*) echo "Pending update size is invalid" >&2; exit 2 ;;
+esac
 ARCHIVE="$UPDATE_DIR/$ASSET"
 
 [ -f "$ARCHIVE" ] || {
   echo "Pending update archive is missing" >&2
   exit 2
 }
-[ "${#SHA256}" -eq 64 ] || {
-  echo "Pending update checksum is invalid" >&2
+ACTUAL_SIZE=$(wc -c < "$ARCHIVE" | tr -d ' ')
+[ "$ACTUAL_SIZE" = "$SIZE" ] || {
+  echo "Pending update size verification failed" >&2
   exit 2
 }
 ACTUAL_SHA=$(sha256sum "$ARCHIVE" | awk '{print $1}')
@@ -154,16 +171,20 @@ NEW_ROOT="$STAGE/PocketMusic"
   echo "Update does not contain updater scripts" >&2
   exit 2
 }
+[ -f "$NEW_ROOT/update/prepare-update.sh" ] || {
+  echo "Update does not contain update preparer" >&2
+  exit 2
+}
 
 # Prepare a complete replacement tree while the live app is still untouched.
-for path in bin assets certs icon.png config.json launch.sh update; do
+for path in $MANAGED_DIRS $MANAGED_FILES; do
   if [ -e "$NEW_ROOT/$path" ]; then
     cp -Rp "$NEW_ROOT/$path" "$PREPARED/$path"
   fi
 done
 
 # Build a complete recovery backup before marking the transaction in progress.
-for path in bin assets certs icon.png config.json launch.sh update; do
+for path in $MANAGED_DIRS $MANAGED_FILES; do
   if [ -e "$APP_DIR/$path" ]; then
     cp -Rp "$APP_DIR/$path" "$BACKUP/$path"
   fi
@@ -192,15 +213,15 @@ trap 'exit 2' HUP INT TERM
 
 # Directories may briefly be absent, but launch.sh remains present and the recovery marker
 # lets the launcher restore the backup after an unexpected reboot.
-for path in bin assets certs update; do
+for path in $MANAGED_DIRS; do
   rm -rf "$APP_DIR/$path"
   if [ -e "$PREPARED/$path" ]; then
     mv "$PREPARED/$path" "$APP_DIR/$path"
   fi
 done
 
-# Root files are replaced atomically. launch.sh is deliberately replaced last.
-for path in icon.png config.json launch.sh; do
+# Root files are replaced atomically. launch.sh is deliberately last in MANAGED_FILES.
+for path in $MANAGED_FILES; do
   if [ -e "$PREPARED/$path" ]; then
     mv -f "$PREPARED/$path" "$APP_DIR/$path"
   else
@@ -223,7 +244,8 @@ sync
 SUCCESS=1
 trap - EXIT HUP INT TERM
 
-rm -f "$PENDING" "$ARCHIVE" "$UPDATE_DIR/pocket-music-update.txt"
+rm -f "$PENDING" "$ARCHIVE" "$UPDATE_DIR/release-manifest.tmp" \
+  "$UPDATE_DIR/pocket-music-update.txt"
 rm -rf "$STAGE" "$PREPARED" "$BACKUP"
 sync
 

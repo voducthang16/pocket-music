@@ -82,7 +82,7 @@ RUN mkdir -p /package/PocketMusic/assets/fonts /package/PocketMusic/bin /package
     && cp /src/assets/fallback-vinyl.png /package/PocketMusic/assets/ \
     && cp /src/assets/icon.png /package/PocketMusic/icon.png \
     && cp /src/platform/trimui/config.json /src/platform/trimui/launch.sh /package/PocketMusic/ \
-    && cp /src/platform/trimui/update/check-update.sh /src/platform/trimui/update/apply-update.sh /package/PocketMusic/update/ \
+    && cp /src/platform/trimui/update/prepare-update.sh /src/platform/trimui/update/apply-update.sh /package/PocketMusic/update/ \
     && chmod +x /package/PocketMusic/launch.sh /package/PocketMusic/bin/pocket-music /package/PocketMusic/update/*.sh
 
 FROM scratch AS export

@@ -25,7 +25,9 @@ write_phase() {
   version=${2:-}
   {
     printf 'phase=%s\n' "$phase"
-    [ -n "$version" ] && printf 'version=%s\n' "$version"
+    if [ -n "$version" ]; then
+      printf 'version=%s\n' "$version"
+    fi
   } > "$PHASE_FILE"
 }
 

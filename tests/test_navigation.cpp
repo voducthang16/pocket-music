@@ -1,3 +1,5 @@
+#include <cstdlib>
+#include <fstream>
 #include <memory>
 
 #include "app/app_state.hpp"
@@ -57,15 +59,79 @@ void homeRowsExposePrimaryDestinations() {
     touch(music / "Album" / "Two.mp3");
     AppState app(music, std::make_unique<FakePlayer>());
     require(app.library.scan(), "Home fixture must scan");
+    unsetenv("POCKET_MUSIC_DATA_DIR");
 
     buildHomeView(app);
 
     require(app.view.items[0].subtitle == "2", "Songs must expose a compact numeric count");
-    require(app.view.items.size() == 3, "Home must contain exactly three destinations");
+    require(app.view.items.size() == 4, "Home must contain the update check destination");
     require(app.view.items[1].title == "Now Playing" && app.view.items[1].subtitle.empty(),
             "Now Playing must be a single-line destination");
     require(app.view.items[2].title == "Liner Notes" && app.view.items[2].subtitle.empty(),
             "Liner Notes must be a single-line destination");
+    require(app.view.items[3].title == "Check for Updates" && app.view.items[3].subtitle.empty(),
+            "Home must expose remote update checks");
+}
+
+void updateCheckRequestsLauncherWork() {
+    TemporaryDirectory temporary;
+    const auto dataDir = temporary.path / "data";
+    AppState app(temporary.path / "Music", std::make_unique<FakePlayer>());
+    buildHomeView(app);
+
+    setenv("POCKET_MUSIC_DATA_DIR", dataDir.c_str(), 1);
+    require(requestUpdateCheck(app), "TrimUI update check must create a launcher request");
+    unsetenv("POCKET_MUSIC_DATA_DIR");
+
+    require(!app.running, "update checks must shut the app down cleanly before network work");
+    require(fs::exists(dataDir / "update" / "check-requested"),
+            "update check request marker must be persisted");
+}
+
+void pendingUpdateRequiresExplicitInstallAction() {
+    TemporaryDirectory temporary;
+    const auto dataDir = temporary.path / "data";
+    fs::create_directories(dataDir / "update");
+    {
+        std::ofstream pending(dataDir / "update" / "pending-update");
+        pending << "version=0.2.0\nasset=test.tar.gz\nsha256=abc\n";
+    }
+
+    setenv("POCKET_MUSIC_DATA_DIR", dataDir.c_str(), 1);
+    AppState app(temporary.path / "Music", std::make_unique<FakePlayer>());
+    buildHomeView(app);
+
+    require(app.view.items.size() == 5, "pending update must add an explicit install destination");
+    require(app.view.items[4].title == "Install Update" && app.view.items[4].subtitle == "v0.2.0",
+            "pending update must show the version before installation");
+    require(requestUpdateInstall(app), "install action must create a launcher request");
+    unsetenv("POCKET_MUSIC_DATA_DIR");
+
+    require(!app.running, "install action must shut the app down before replacing files");
+    require(fs::exists(dataDir / "update" / "install-requested"),
+            "install request marker must be persisted");
+}
+
+void updateInstallRequiresPendingUpdate() {
+    TemporaryDirectory temporary;
+    const auto dataDir = temporary.path / "data";
+    setenv("POCKET_MUSIC_DATA_DIR", dataDir.c_str(), 1);
+    AppState app(temporary.path / "Music", std::make_unique<FakePlayer>());
+
+    require(!requestUpdateInstall(app), "install must refuse when no verified update is pending");
+    unsetenv("POCKET_MUSIC_DATA_DIR");
+    require(app.running, "refused install must keep the app running");
+    require(!app.message.empty(), "refused install must explain why it cannot proceed");
+}
+
+void updateCheckIsTrimuiOnly() {
+    TemporaryDirectory temporary;
+    AppState app(temporary.path / "Music", std::make_unique<FakePlayer>());
+    unsetenv("POCKET_MUSIC_DATA_DIR");
+
+    require(!requestUpdateCheck(app), "desktop update check must not attempt TrimUI update flow");
+    require(app.running, "unsupported update check must keep the app running");
+    require(!app.message.empty(), "unsupported update check must explain why it is unavailable");
 }
 
 void trimuiFaceButtonMapping() {
@@ -174,6 +240,11 @@ void addNavigationTests(TestCases& tests) {
     tests.emplace_back("navigation queue", navigationQueue);
     tests.emplace_back("failed load", failedLoad);
     tests.emplace_back("Home primary destinations", homeRowsExposePrimaryDestinations);
+    tests.emplace_back("update check requests launcher work", updateCheckRequestsLauncherWork);
+    tests.emplace_back("pending update requires explicit install",
+                       pendingUpdateRequiresExplicitInstallAction);
+    tests.emplace_back("update install requires pending update", updateInstallRequiresPendingUpdate);
+    tests.emplace_back("update check is TrimUI only", updateCheckIsTrimuiOnly);
     tests.emplace_back("TrimUI face button mapping", trimuiFaceButtonMapping);
     tests.emplace_back("TrimUI Select repeat mapping", trimuiSelectCyclesRepeatMode);
     tests.emplace_back("restored Now Playing back returns to Home",

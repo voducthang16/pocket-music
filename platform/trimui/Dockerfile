@@ -74,14 +74,15 @@ RUN cmake -S /src -B /tmp/pocket-music-build \
     && cmake --build /tmp/pocket-music-build -j4 \
     && ${CROSS_COMPILE}strip /tmp/pocket-music-build/pocket-music
 
-RUN mkdir -p /package/PocketMusic/assets/fonts /package/PocketMusic/bin /package/PocketMusic/data \
+RUN mkdir -p /package/PocketMusic/assets/fonts /package/PocketMusic/bin /package/PocketMusic/data /package/PocketMusic/update \
     && cp /tmp/pocket-music-build/pocket-music /package/PocketMusic/bin/ \
     && cp /src/assets/fonts/NotoSans-Regular.ttf /package/PocketMusic/assets/fonts/ \
     && cp /src/assets/background-hello-kitty-v6.png /package/PocketMusic/assets/ \
     && cp /src/assets/fallback-vinyl.png /package/PocketMusic/assets/ \
     && cp /src/assets/icon.png /package/PocketMusic/icon.png \
     && cp /src/platform/trimui/config.json /src/platform/trimui/launch.sh /package/PocketMusic/ \
-    && chmod +x /package/PocketMusic/launch.sh /package/PocketMusic/bin/pocket-music
+    && cp /src/platform/trimui/update/check-update.sh /src/platform/trimui/update/apply-update.sh /package/PocketMusic/update/ \
+    && chmod +x /package/PocketMusic/launch.sh /package/PocketMusic/bin/pocket-music /package/PocketMusic/update/*.sh
 
 FROM scratch AS export
 COPY --from=app /package/ /

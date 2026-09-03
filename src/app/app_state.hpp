@@ -16,7 +16,14 @@
 #include "ui/theme.hpp"
 
 enum class Screen { Home, Songs, NowPlaying, LinerNotes };
-enum class ViewAction { None, OpenSongs, OpenNowPlaying, OpenLinerNotes };
+enum class ViewAction {
+    None,
+    OpenSongs,
+    OpenNowPlaying,
+    OpenLinerNotes,
+    CheckForUpdates,
+    InstallUpdate
+};
 
 struct ViewItem {
     std::string title;

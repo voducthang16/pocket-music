@@ -1,31 +1,100 @@
 #include "ui/input.hpp"
 
 #include "app/navigation.hpp"
-void handleKey(AppState& app, SDL_Keycode code) {
+
+std::optional<InputAction> keyboardInputAction(SDL_Keycode code) {
+    switch (code) {
+        case SDLK_UP:
+            return InputAction::Up;
+        case SDLK_DOWN:
+            return InputAction::Down;
+        case SDLK_LEFT:
+            return InputAction::SeekBack;
+        case SDLK_RIGHT:
+            return InputAction::SeekForward;
+        case SDLK_RETURN:
+        case SDLK_a:
+            return InputAction::Confirm;
+        case SDLK_ESCAPE:
+        case SDLK_b:
+            return InputAction::Back;
+        case SDLK_SPACE:
+        case SDLK_s:
+            return InputAction::PlayPause;
+        case SDLK_q:
+            return InputAction::Previous;
+        case SDLK_e:
+            return InputAction::Next;
+        case SDLK_x:
+            return InputAction::NowPlaying;
+        case SDLK_y:
+            return InputAction::Shuffle;
+        case SDLK_r:
+            return InputAction::Repeat;
+        default:
+            return std::nullopt;
+    }
+}
+
+std::optional<InputAction> controllerInputAction(Uint8 button) {
+    switch (button) {
+        case SDL_CONTROLLER_BUTTON_DPAD_UP:
+            return InputAction::Up;
+        case SDL_CONTROLLER_BUTTON_DPAD_DOWN:
+            return InputAction::Down;
+        case SDL_CONTROLLER_BUTTON_DPAD_LEFT:
+            return InputAction::SeekBack;
+        case SDL_CONTROLLER_BUTTON_DPAD_RIGHT:
+            return InputAction::SeekForward;
+        case SDL_CONTROLLER_BUTTON_A:
+            return InputAction::Back;
+        case SDL_CONTROLLER_BUTTON_B:
+            return InputAction::Confirm;
+        case SDL_CONTROLLER_BUTTON_START:
+            return InputAction::PlayPause;
+        case SDL_CONTROLLER_BUTTON_BACK:
+            return InputAction::Repeat;
+        case SDL_CONTROLLER_BUTTON_LEFTSHOULDER:
+            return InputAction::Previous;
+        case SDL_CONTROLLER_BUTTON_RIGHTSHOULDER:
+            return InputAction::Next;
+        case SDL_CONTROLLER_BUTTON_X:
+            return InputAction::Shuffle;
+        case SDL_CONTROLLER_BUTTON_Y:
+            return InputAction::NowPlaying;
+        default:
+            return std::nullopt;
+    }
+}
+
+bool isRepeatable(InputAction action) {
+    return action == InputAction::Up || action == InputAction::Down ||
+           action == InputAction::SeekBack || action == InputAction::SeekForward;
+}
+
+void handleInputAction(AppState& app, InputAction action) {
     const auto& update = app.updates.state();
     if (update.modalVisible()) {
-        if (update.cancellable() && (code == SDLK_ESCAPE || code == SDLK_b)) app.updates.cancel();
+        if (update.cancellable() && action == InputAction::Back) app.updates.cancel();
         return;
     }
     if (app.exitConfirmationOpen) {
-        switch (code) {
-            case SDLK_LEFT:
-            case SDLK_UP:
+        switch (action) {
+            case InputAction::Up:
+            case InputAction::SeekBack:
                 app.exitConfirmationSelection = 0;
                 break;
-            case SDLK_RIGHT:
-            case SDLK_DOWN:
+            case InputAction::Down:
+            case InputAction::SeekForward:
                 app.exitConfirmationSelection = 1;
                 break;
-            case SDLK_RETURN:
-            case SDLK_a:
+            case InputAction::Confirm:
                 if (app.exitConfirmationSelection == 1)
                     app.running = false;
                 else
                     app.exitConfirmationOpen = false;
                 break;
-            case SDLK_ESCAPE:
-            case SDLK_b:
+            case InputAction::Back:
                 app.exitConfirmationOpen = false;
                 break;
             default:
@@ -34,96 +103,49 @@ void handleKey(AppState& app, SDL_Keycode code) {
         return;
     }
     const auto& items = app.view.items;
-    switch (code) {
-        case SDLK_UP:
+    switch (action) {
+        case InputAction::Up:
             if (!items.empty())
                 app.view.selected = (app.view.selected - 1 + static_cast<int>(items.size())) %
                                     static_cast<int>(items.size());
             break;
-        case SDLK_DOWN:
+        case InputAction::Down:
             if (!items.empty())
                 app.view.selected = (app.view.selected + 1) % static_cast<int>(items.size());
             break;
-        case SDLK_RETURN:
-        case SDLK_a:
+        case InputAction::Confirm:
             selectCurrentItem(app);
             break;
-        case SDLK_ESCAPE:
-        case SDLK_b:
+        case InputAction::Back:
             navigateBack(app);
             break;
-        case SDLK_SPACE:
-        case SDLK_s:
+        case InputAction::PlayPause:
             if (app.playback.snapshot().phase == PlaybackPhase::Error)
                 app.playback.retry();
             else
                 app.playback.togglePause();
             break;
-        case SDLK_LEFT:
+        case InputAction::SeekBack:
             app.playback.seekRelative(-10);
             break;
-        case SDLK_RIGHT:
+        case InputAction::SeekForward:
             app.playback.seekRelative(10);
             break;
-        case SDLK_q:
+        case InputAction::Previous:
             playAdjacentTrack(app, -1);
             break;
-        case SDLK_e:
+        case InputAction::Next:
             playAdjacentTrack(app, 1);
             break;
-        case SDLK_x:
+        case InputAction::NowPlaying:
             openNowPlaying(app);
             break;
-        case SDLK_y:
+        case InputAction::Shuffle:
             app.playback.setShuffle(!app.playback.shuffle());
             break;
-        case SDLK_r:
+        case InputAction::Repeat:
             app.playback.setRepeatMode(
                 static_cast<RepeatMode>((static_cast<int>(app.playback.repeatMode()) + 1) % 3));
-            break;
-        default:
-            break;
-    }
-}
-void handleControllerButton(AppState& app, Uint8 b) {
-    switch (b) {
-        case SDL_CONTROLLER_BUTTON_DPAD_UP:
-            handleKey(app, SDLK_UP);
-            break;
-        case SDL_CONTROLLER_BUTTON_DPAD_DOWN:
-            handleKey(app, SDLK_DOWN);
-            break;
-        case SDL_CONTROLLER_BUTTON_DPAD_LEFT:
-            handleKey(app, SDLK_LEFT);
-            break;
-        case SDL_CONTROLLER_BUTTON_DPAD_RIGHT:
-            handleKey(app, SDLK_RIGHT);
-            break;
-        case SDL_CONTROLLER_BUTTON_A:
-            handleKey(app, SDLK_ESCAPE);
-            break;
-        case SDL_CONTROLLER_BUTTON_B:
-            handleKey(app, SDLK_RETURN);
-            break;
-        case SDL_CONTROLLER_BUTTON_START:
-            handleKey(app, SDLK_SPACE);
-            break;
-        case SDL_CONTROLLER_BUTTON_BACK:
-            handleKey(app, SDLK_r);
-            break;
-        case SDL_CONTROLLER_BUTTON_LEFTSHOULDER:
-            handleKey(app, SDLK_q);
-            break;
-        case SDL_CONTROLLER_BUTTON_RIGHTSHOULDER:
-            handleKey(app, SDLK_e);
-            break;
-        case SDL_CONTROLLER_BUTTON_X:
-            handleKey(app, SDLK_y);
-            break;
-        case SDL_CONTROLLER_BUTTON_Y:
-            handleKey(app, SDLK_x);
-            break;
-        default:
             break;
     }
 }

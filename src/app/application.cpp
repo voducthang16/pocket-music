@@ -164,17 +164,14 @@ int runApplication(const std::filesystem::path& musicPath, const std::filesystem
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT)
                 app.running = false;
-            else if (event.type == SDL_KEYDOWN &&
-                     (!event.key.repeat || event.key.keysym.sym == SDLK_UP ||
-                      event.key.keysym.sym == SDLK_DOWN || event.key.keysym.sym == SDLK_LEFT ||
-                      event.key.keysym.sym == SDLK_RIGHT))
-                handleKey(app, event.key.keysym.sym);
-            else if (event.type == SDL_CONTROLLERBUTTONDOWN) {
-                handleControllerButton(app, event.cbutton.button);
-                if (event.cbutton.button == SDL_CONTROLLER_BUTTON_DPAD_UP ||
-                    event.cbutton.button == SDL_CONTROLLER_BUTTON_DPAD_DOWN ||
-                    event.cbutton.button == SDL_CONTROLLER_BUTTON_DPAD_LEFT ||
-                    event.cbutton.button == SDL_CONTROLLER_BUTTON_DPAD_RIGHT) {
+            else if (event.type == SDL_KEYDOWN) {
+                const auto action = keyboardInputAction(event.key.keysym.sym);
+                if (action && (!event.key.repeat || isRepeatable(*action)))
+                    handleInputAction(app, *action);
+            } else if (event.type == SDL_CONTROLLERBUTTONDOWN) {
+                const auto action = controllerInputAction(event.cbutton.button);
+                if (action) handleInputAction(app, *action);
+                if (action && isRepeatable(*action)) {
                     heldButton = event.cbutton.button;
                     nextControllerRepeat = SDL_GetTicks64() + 350;
                 }
@@ -183,7 +180,8 @@ int runApplication(const std::filesystem::path& musicPath, const std::filesystem
             }
         }
         if (heldButton >= 0 && SDL_GetTicks64() >= nextControllerRepeat) {
-            handleControllerButton(app, static_cast<Uint8>(heldButton));
+            if (const auto action = controllerInputAction(static_cast<Uint8>(heldButton)))
+                handleInputAction(app, *action);
             nextControllerRepeat = SDL_GetTicks64() + 90;
         }
         if (app.updates.poll()) refreshHomeView(app);

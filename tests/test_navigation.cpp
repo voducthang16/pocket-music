@@ -143,7 +143,7 @@ void updateCheckRunsInsideApp() {
     require(app.updates.state().checking(),
             "update check must expose semantic active state without a process id");
 
-    handleKey(app, SDLK_DOWN);
+    handleInputAction(app, InputAction::Down);
     require(app.view.selected == 3, "update loading modal must block duplicate navigation input");
 
     for (int attempt = 0; attempt < 100 && app.updates.state().checking(); ++attempt) {
@@ -189,7 +189,7 @@ void updateCancellationIsNonBlocking() {
     require(app.updates.check(), "cancellation fixture must start preparer");
 
     const auto started = std::chrono::steady_clock::now();
-    handleKey(app, SDLK_b);
+    handleInputAction(app, InputAction::Back);
     const auto elapsed = std::chrono::steady_clock::now() - started;
     require(elapsed < std::chrono::milliseconds(200),
             "cancel input must not block waiting for the update preparer");
@@ -235,7 +235,7 @@ void pendingUpdateRequiresExplicitInstallAction() {
     require(fs::exists(dataDir / "update" / "install-requested"),
             "install request marker must be persisted before shutdown");
 
-    handleKey(app, SDLK_DOWN);
+    handleInputAction(app, InputAction::Down);
     require(app.view.selected == 4, "install handoff modal must block navigation input");
 
     finishDeferredUpdateHandoff(app);
@@ -294,6 +294,24 @@ void updateCheckIsTrimuiOnly() {
     require(notice && !notice->empty(), "unsupported update check must emit a user notice");
 }
 
+void inputAdaptersMapToSemanticActions() {
+    require(keyboardInputAction(SDLK_RETURN) == InputAction::Confirm,
+            "keyboard confirm must map to semantic Confirm");
+    require(keyboardInputAction(SDLK_LEFT) == InputAction::SeekBack &&
+                isRepeatable(*keyboardInputAction(SDLK_LEFT)),
+            "keyboard seek must map to a repeatable semantic action");
+    require(controllerInputAction(SDL_CONTROLLER_BUTTON_B) == InputAction::Confirm,
+            "TrimUI physical A must map directly to semantic Confirm");
+    require(controllerInputAction(SDL_CONTROLLER_BUTTON_A) == InputAction::Back,
+            "TrimUI physical B must map directly to semantic Back");
+    require(controllerInputAction(SDL_CONTROLLER_BUTTON_X) == InputAction::Shuffle &&
+                controllerInputAction(SDL_CONTROLLER_BUTTON_Y) == InputAction::NowPlaying,
+            "TrimUI X/Y reversal must remain isolated in the controller adapter");
+    require(
+        !keyboardInputAction(SDLK_UNKNOWN) && !controllerInputAction(SDL_CONTROLLER_BUTTON_INVALID),
+        "unmapped physical input must not invent an application action");
+}
+
 void trimuiFaceButtonMapping() {
     TemporaryDirectory temporary;
     const auto music = temporary.path / "Music";
@@ -302,19 +320,19 @@ void trimuiFaceButtonMapping() {
     require(app.library.scan(), "controller fixture must scan");
     buildHomeView(app);
 
-    handleControllerButton(app, SDL_CONTROLLER_BUTTON_B);
+    handleInputAction(app, *controllerInputAction(SDL_CONTROLLER_BUTTON_B));
     require(app.view.screen == Screen::Songs, "TrimUI A button must select Songs");
 
-    handleControllerButton(app, SDL_CONTROLLER_BUTTON_A);
+    handleInputAction(app, *controllerInputAction(SDL_CONTROLLER_BUTTON_A));
     require(app.view.screen == Screen::Home, "TrimUI B button must navigate back");
 
     require(app.playback.play(0, app.library.allTrackIndexes()),
             "controller fixture must start playback");
-    handleControllerButton(app, SDL_CONTROLLER_BUTTON_X);
+    handleInputAction(app, *controllerInputAction(SDL_CONTROLLER_BUTTON_X));
     require(app.playback.shuffle(), "TrimUI Y button must toggle shuffle");
     require(app.view.screen == Screen::Home, "TrimUI Y button must not open Now Playing");
 
-    handleControllerButton(app, SDL_CONTROLLER_BUTTON_Y);
+    handleInputAction(app, *controllerInputAction(SDL_CONTROLLER_BUTTON_Y));
     require(app.view.screen == Screen::NowPlaying, "TrimUI X button must open Now Playing");
 }
 
@@ -322,12 +340,12 @@ void trimuiSelectCyclesRepeatMode() {
     TemporaryDirectory temporary;
     AppState app(temporary.path / "Music", std::make_unique<FakePlayer>());
 
-    handleControllerButton(app, SDL_CONTROLLER_BUTTON_BACK);
+    handleInputAction(app, *controllerInputAction(SDL_CONTROLLER_BUTTON_BACK));
     require(app.playback.repeatMode() == RepeatMode::One, "TrimUI Select must enable repeat one");
-    handleControllerButton(app, SDL_CONTROLLER_BUTTON_BACK);
+    handleInputAction(app, *controllerInputAction(SDL_CONTROLLER_BUTTON_BACK));
     require(app.playback.repeatMode() == RepeatMode::All,
             "TrimUI Select must advance to repeat all");
-    handleControllerButton(app, SDL_CONTROLLER_BUTTON_BACK);
+    handleInputAction(app, *controllerInputAction(SDL_CONTROLLER_BUTTON_BACK));
     require(app.playback.repeatMode() == RepeatMode::Off,
             "TrimUI Select must cycle repeat back to off");
 }
@@ -353,17 +371,17 @@ void homeExitRequiresConfirmation() {
     AppState app(temporary.path / "Music", std::make_unique<FakePlayer>());
     buildHomeView(app);
 
-    handleKey(app, SDLK_b);
+    handleInputAction(app, InputAction::Back);
     require(app.running && app.exitConfirmationOpen && app.exitConfirmationSelection == 0,
             "Home Back must open exit confirmation on Stay");
 
-    handleKey(app, SDLK_RETURN);
+    handleInputAction(app, InputAction::Confirm);
     require(app.running && !app.exitConfirmationOpen,
             "confirming Stay must close the dialog and keep running");
 
-    handleKey(app, SDLK_b);
-    handleKey(app, SDLK_RIGHT);
-    handleKey(app, SDLK_RETURN);
+    handleInputAction(app, InputAction::Back);
+    handleInputAction(app, InputAction::SeekForward);
+    handleInputAction(app, InputAction::Confirm);
     require(!app.running, "confirming Exit must stop the app");
 }
 
@@ -409,6 +427,7 @@ void addNavigationTests(TestCases& tests) {
                        updateInstallRequiresPendingUpdate);
     tests.emplace_back("update status uses notice channel", updateStatusUsesNoticeChannel);
     tests.emplace_back("update check is TrimUI only", updateCheckIsTrimuiOnly);
+    tests.emplace_back("semantic input adapters", inputAdaptersMapToSemanticActions);
     tests.emplace_back("TrimUI face button mapping", trimuiFaceButtonMapping);
     tests.emplace_back("TrimUI Select repeat mapping", trimuiSelectCyclesRepeatMode);
     tests.emplace_back("restored Now Playing back returns to Home",

@@ -25,7 +25,6 @@ rollback() {
   done
   sync
 }
-trap rollback EXIT HUP INT TERM
 
 [ -f "$PENDING" ] || {
   echo "No pending Pocket Music update" >&2
@@ -42,6 +41,10 @@ ARCHIVE="$UPDATE_DIR/$ASSET"
   exit 2
 }
 
+[ "${#SHA256}" -eq 64 ] || {
+  echo "Pending update checksum is invalid" >&2
+  exit 2
+}
 ACTUAL_SHA=$(sha256sum "$ARCHIVE" | awk '{print $1}')
 [ "$ACTUAL_SHA" = "$SHA256" ] || {
   echo "Pending update checksum verification failed" >&2
@@ -51,7 +54,19 @@ ACTUAL_SHA=$(sha256sum "$ARCHIVE" | awk '{print $1}')
 rm -rf "$STAGE" "$BACKUP"
 mkdir -p "$STAGE" "$BACKUP"
 
-tar -tzf "$ARCHIVE" | grep '^PocketMusic/data\(/\|$\)' >/dev/null 2>&1 && {
+ARCHIVE_LIST=$(tar -tzf "$ARCHIVE") || {
+  echo "Could not inspect update archive" >&2
+  exit 2
+}
+printf '%s\n' "$ARCHIVE_LIST" | grep -E '(^|/)\.\.(/|$)' >/dev/null 2>&1 && {
+  echo "Update archive contains unsafe paths" >&2
+  exit 2
+}
+printf '%s\n' "$ARCHIVE_LIST" | grep -v -E '^PocketMusic(/|$)' | grep . >/dev/null 2>&1 && {
+  echo "Update archive contains files outside PocketMusic" >&2
+  exit 2
+}
+printf '%s\n' "$ARCHIVE_LIST" | grep -E '^PocketMusic/data(/|$)' >/dev/null 2>&1 && {
   echo "Update archive unexpectedly contains persistent data" >&2
   exit 2
 }
@@ -67,11 +82,14 @@ NEW_ROOT="$STAGE/PocketMusic"
   exit 2
 }
 
+# Build a complete backup before arming rollback. Until this finishes the live app is untouched.
 for path in bin assets icon.png config.json launch.sh update; do
   if [ -e "$APP_DIR/$path" ]; then
     cp -Rp "$APP_DIR/$path" "$BACKUP/$path"
   fi
 done
+
+trap rollback EXIT HUP INT TERM
 
 for path in bin assets icon.png config.json launch.sh update; do
   rm -rf "$APP_DIR/$path"

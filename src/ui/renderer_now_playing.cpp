@@ -31,10 +31,9 @@ void drawTransport(AppState& app, const Track* track) {
                  app.theme.text, 100, true);
     }
     drawText(app.renderer, app.smallFont, "R1  NEXT", 772, y + 105, app.theme.textMuted, 180, true);
-    drawText(app.renderer, app.smallFont, std::string(presentation.status), layout::width / 2,
-             y + 62,
-             playback.phase == PlaybackPhase::Error ? app.theme.accent : app.theme.textMuted, 360,
-             true);
+    drawText(
+        app.renderer, app.smallFont, std::string(presentation.status), layout::width / 2, y + 62,
+        playback.phase == PlaybackPhase::Error ? app.theme.accent : app.theme.textMuted, 360, true);
 }
 }  // namespace
 

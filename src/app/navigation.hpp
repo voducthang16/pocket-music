@@ -9,6 +9,8 @@ bool playTrack(AppState& app, size_t trackIndex, const std::vector<size_t>& queu
                std::optional<size_t> sourcePosition = std::nullopt);
 void playAdjacentTrack(AppState& app, int direction);
 bool requestUpdateCheck(AppState& app);
+void pollUpdateCheck(AppState& app);
+void cancelUpdateCheck(AppState& app);
 bool requestUpdateInstall(AppState& app);
 void selectCurrentItem(AppState& app);
 void navigateBack(AppState& app);

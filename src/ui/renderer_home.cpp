@@ -12,8 +12,7 @@ void drawHomeScreen(AppState& app) {
     for (int index = 0; index < static_cast<int>(items.size()); ++index) {
         const int y = layout::contentRowsY + index * layout::contentRowHeight;
         const auto presentation = homeRowPresentation(items[index]);
-        drawHomeRow(app, items[index], index, y, index == app.view.selected,
-                    presentation.chevron);
+        drawHomeRow(app, items[index], index, y, index == app.view.selected, presentation.chevron);
     }
     drawNowPlayingBand(app);
 }

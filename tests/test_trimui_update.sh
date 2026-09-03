@@ -201,6 +201,7 @@ LAUNCH_DATA="$LAUNCH_APP/data"
 LAUNCH_SD="$TMP/sdcard"
 LAUNCH_RUN_LOG="$TMP/launcher-runs"
 populate_app "$LAUNCH_APP" "0.1.0"
+mkdir -p "$LAUNCH_DATA/update"
 printf 'launcher-preserve-me\n' > "$LAUNCH_DATA/user-state"
 cp "$RELEASES/$ASSET" "$LAUNCH_DATA/update/$ASSET"
 cat > "$LAUNCH_DATA/update/pending-update" <<EOF

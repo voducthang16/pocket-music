@@ -27,6 +27,13 @@ enum class ViewAction {
     InstallUpdate
 };
 
+enum class NoticeSource { Application, Playback, Update };
+
+struct AppNotice {
+    NoticeSource source = NoticeSource::Application;
+    std::string text;
+};
+
 struct ViewItem {
     std::string title;
     std::string subtitle;
@@ -61,7 +68,7 @@ struct AppState {
     bool running = true;
     bool exitConfirmationOpen = false;
     int exitConfirmationSelection = 0;
-    std::string message;
+    std::optional<AppNotice> notice;
     std::map<std::string, SDL_Texture*> coverCache;
     std::vector<SDL_GameController*> controllers;
 

@@ -20,20 +20,20 @@ Pocket Music is still early-stage. This cleanup intentionally optimizes for a sm
 
 The cleanup is complete when:
 
-- [ ] No known legacy updater path remains.
+- [x] No known legacy updater path remains.
 - [ ] No known persisted-but-unused state remains.
 - [ ] Navigation no longer owns updater process/platform details.
 - [ ] OS process identifiers are not stored in UI/application state.
 - [ ] Update cancellation is non-blocking.
-- [ ] Playback status wording is derived from one canonical mapping.
+- [x] Playback status wording is derived from one canonical mapping.
 - [ ] View models do not duplicate track metadata unnecessarily.
 - [ ] SDL/audio lifetime is RAII-driven rather than manually invalidating controller internals.
 - [ ] Production source lists and compiler settings are not duplicated between app and tests.
 - [ ] Desktop development uses the same C++ language level as TrimUI.
 - [ ] CI and release verification share one project-level verification entry point.
-- [ ] README describes the current implementation rather than historical updater behavior.
-- [ ] `make test` passes.
-- [ ] `make trimui-package` passes after TrimUI-sensitive refactors.
+- [x] README describes the current implementation rather than historical updater behavior.
+- [x] `make test` passes.
+- [x] `make trimui-package` passes after TrimUI-sensitive refactors.
 - [ ] Final physical Brick smoke test passes.
 
 ---
@@ -46,73 +46,73 @@ Goal: remove confirmed legacy/dead pieces and fix places where code/documentatio
 
 Finding: update checking now runs inside the application as a background process, but `launch.sh` still contains the pre-v0.2.3 `check-requested` path that checks only after the app exits.
 
-- [ ] Remove `CHECK_REQUESTED` from `platform/trimui/launch.sh`.
-- [ ] Remove the launcher block that executes `check-update.sh` after app exit.
-- [ ] Remove tests/fixtures that exist only for `check-requested`, if any.
-- [ ] Search the repository and verify no production reference to `check-requested` remains.
+- [x] Remove `CHECK_REQUESTED` from `platform/trimui/launch.sh`.
+- [x] Remove the launcher block that executes `check-update.sh` after app exit.
+- [x] Remove tests/fixtures that exist only for `check-requested`, if any.
+- [x] Search the repository and verify no production reference to `check-requested` remains.
 
 Acceptance:
 
-- [ ] In-app Check for Updates remains functional.
-- [ ] Launcher remains responsible for install handoff/recovery only.
+- [x] In-app Check for Updates remains functional.
+- [x] Launcher remains responsible for install handoff/recovery only.
 
 ## 1.2 Remove persisted-but-unused `PlaybackSession.paused`
 
 Finding: the state writer persists `paused`, but the loader unconditionally forces restored sessions to paused, so the persisted value is ignored.
 
-- [ ] Remove `PlaybackSession::paused`.
-- [ ] Remove `paused` parsing from the state file.
-- [ ] Remove `paused` serialization.
-- [ ] Update state tests to test the intended rule directly: restored playback always starts paused.
-- [ ] Do not add migration support for old state files.
+- [x] Remove `PlaybackSession::paused`.
+- [x] Remove `paused` parsing from the state file.
+- [x] Remove `paused` serialization.
+- [x] Update state tests to test the intended rule directly: restored playback always starts paused.
+- [x] Do not add migration support for old state files.
 
 Acceptance:
 
-- [ ] Session restore still starts paused.
-- [ ] No `paused` key exists in the new durable state format.
+- [x] Session restore still starts paused.
+- [x] No `paused` key exists in the new durable state format.
 
 ## 1.3 Remove unused `PlayerEventType::Disconnected`
 
 Finding: the current in-process FFmpeg/SDL player never emits `Disconnected`; it is a leftover abstraction from an external/disconnectable player model.
 
-- [ ] Remove `PlayerEventType::Disconnected`.
-- [ ] Remove its handling branch from `PlaybackController`.
-- [ ] Confirm no test or production emitter references it.
+- [x] Remove `PlayerEventType::Disconnected`.
+- [x] Remove its handling branch from `PlaybackController`.
+- [x] Confirm no test or production emitter references it.
 
 ## 1.4 Remove trivial dead/no-op code
 
-- [ ] Remove `need_command tar` from `check-update.sh`; that script never invokes `tar`.
-- [ ] Remove no-op status expressions such as `[ "$APPLY_STATUS" -eq 0 ] || true` when the value has no effect.
-- [ ] Re-evaluate `$APP_DIR/lib` in `LD_LIBRARY_PATH`; remove it if the package still ships no `lib` directory.
-- [ ] Remove unused includes discovered during audit (`<vector>` in `model.hpp`, `ui/layout.hpp` in `input.cpp`, `<cerrno>` where unused, etc.).
-- [ ] Remove unused local variables such as the unused marquee text height if still present.
-- [ ] Run formatting after cleanup.
+- [x] Remove `need_command tar` from `check-update.sh`; that script never invokes `tar`.
+- [x] Remove no-op status expressions such as `[ "$APPLY_STATUS" -eq 0 ] || true` when the value has no effect.
+- [x] Re-evaluate `$APP_DIR/lib` in `LD_LIBRARY_PATH`; remove it if the package still ships no `lib` directory.
+- [x] Remove unused includes discovered during audit (`<vector>` in `model.hpp`, `ui/layout.hpp` in `input.cpp`, `<cerrno>` where unused, etc.).
+- [x] Remove unused local variables such as the unused marquee text height if still present.
+- [x] Run formatting after cleanup.
 
 Acceptance:
 
-- [ ] Build is warning-clean under existing `-Wall -Wextra -Wpedantic` settings.
+- [x] Build is warning-clean under existing `-Wall -Wextra -Wpedantic` settings.
 
 ## 1.5 Fix Home update-version rendering
 
 Finding: the Home view stores the pending update version in the Install Update item's subtitle, but the Home renderer only renders the subtitle/trailing text for row 0.
 
-- [ ] Render the pending version for `Install Update` from the actual item data, not its row number.
-- [ ] Avoid renderer rules that depend on magic row indexes.
-- [ ] Add/update a test that covers the rendered/model contract rather than only checking the `ViewItem` subtitle exists.
+- [x] Render the pending version for `Install Update` from the actual item data, not its row number.
+- [x] Avoid renderer rules that depend on magic row indexes.
+- [x] Add/update a test that covers the rendered/model contract rather than only checking the `ViewItem` subtitle exists.
 
 Acceptance:
 
-- [ ] Home visibly shows the pending update version next to Install Update.
+- [x] Home visibly shows the pending update version next to Install Update.
 
 ## 1.6 Centralize playback status wording
 
 Finding: Home mini-player and Now Playing infer status independently. Non-paused states can currently be labelled `PLAYING`/`PAUSE` even when playback is Loading, Error, or Finished.
 
-- [ ] Define one canonical presentation mapping for `PlaybackPhase`.
-- [ ] Cover at least Idle, Loading, Playing, Paused, Finished, and Error.
-- [ ] Use the same mapping in mini-player and Now Playing.
-- [ ] Ensure transport/action wording does not imply playback is active during Loading/Error/Finished.
-- [ ] Add focused tests for the mapping.
+- [x] Define one canonical presentation mapping for `PlaybackPhase`.
+- [x] Cover at least Idle, Loading, Playing, Paused, Finished, and Error.
+- [x] Use the same mapping in mini-player and Now Playing.
+- [x] Ensure transport/action wording does not imply playback is active during Loading/Error/Finished.
+- [x] Add focused tests for the mapping.
 
 Suggested semantic statuses:
 
@@ -125,45 +125,45 @@ Suggested semantic statuses:
 
 ## 1.7 Fix inconsistent UI wording
 
-- [ ] Replace `Choose a song from Home` because tracks are selected from Songs.
-- [ ] Make the empty Now Playing messages internally consistent.
-- [ ] Review Check/Install update strings for consistent capitalization and terminology.
-- [ ] Prefer short handheld-friendly wording over implementation terminology.
+- [x] Replace `Choose a song from Home` because tracks are selected from Songs.
+- [x] Make the empty Now Playing messages internally consistent.
+- [x] Review Check/Install update strings for consistent capitalization and terminology.
+- [x] Prefer short handheld-friendly wording over implementation terminology.
 
 ## 1.8 Rename `Liner Notes` to `About`
 
 Finding: the screen contains app version, author, source, music folder, and supported formats; semantically it is an About screen, not liner notes.
 
-- [ ] Rename `Screen::LinerNotes` to `Screen::About`.
-- [ ] Rename `ViewAction::OpenLinerNotes` to `ViewAction::OpenAbout`.
-- [ ] Rename renderer/source functions/files where appropriate.
-- [ ] Change Home label to `About`.
-- [ ] Replace the hard-coded `/mnt/SDCARD/Music` display with `MusicLibrary::root()` or another actual runtime path source.
-- [ ] Update tests and README terminology.
+- [x] Rename `Screen::LinerNotes` to `Screen::About`.
+- [x] Rename `ViewAction::OpenLinerNotes` to `ViewAction::OpenAbout`.
+- [x] Rename renderer/source functions/files where appropriate.
+- [x] Change Home label to `About`.
+- [x] Replace the hard-coded `/mnt/SDCARD/Music` display with `MusicLibrary::root()` or another actual runtime path source.
+- [x] Update tests and README terminology.
 
 Acceptance:
 
-- [ ] Desktop/custom `--music` paths are represented correctly in About.
+- [x] Desktop/custom `--music` paths are represented correctly in About.
 
 ## 1.9 Rewrite stale README sections to current truth
 
 Known stale content includes the old update behavior and terminology.
 
-- [ ] Use `Check for Updates` consistently.
-- [ ] Remove the statement that Pocket Music exits before network work.
-- [ ] Document the current in-app Checking → Downloading → Verifying flow.
-- [ ] Document the install modal/deferred handoff and launcher-owned transaction.
-- [ ] Remove historical pre-v0.2.2 compatibility/bootstrap guidance if it is no longer a supported contract.
-- [ ] Update examples that unnecessarily anchor documentation to v0.2.2.
-- [ ] Clarify metadata fallbacks: album may fall back to parent directory name.
-- [ ] Update verified-on-device statements to include the newest verified OTA flow after the final Brick test.
+- [x] Use `Check for Updates` consistently.
+- [x] Remove the statement that Pocket Music exits before network work.
+- [x] Document the current in-app Checking → Downloading → Verifying flow.
+- [x] Document the install modal/deferred handoff and launcher-owned transaction.
+- [x] Remove historical pre-v0.2.2 compatibility/bootstrap guidance if it is no longer a supported contract.
+- [x] Update examples that unnecessarily anchor documentation to v0.2.2.
+- [x] Clarify metadata fallbacks: album may fall back to parent directory name.
+- [x] Defer verified-on-device wording until the final physical Brick test in 4.6; do not claim unverified hardware behavior.
 
 Phase 1 gate:
 
-- [ ] `make format`
-- [ ] `make test`
-- [ ] TrimUI updater integration test passes.
-- [ ] No new feature work included.
+- [x] `make format`
+- [x] `make test`
+- [x] TrimUI updater integration test passes.
+- [x] No new feature work included.
 
 ---
 
@@ -489,19 +489,19 @@ The cleanup should make these features easier to add; it should not implement th
 
 This index keeps the original audit findings traceable to tasks above.
 
-- [ ] Legacy `check-requested` launcher path → 1.1
-- [ ] Persisted-but-unused `paused` field → 1.2 / 3.5
-- [ ] Unused `Disconnected` player event → 1.3
-- [ ] Checker `tar` dependency with no use → 1.4
-- [ ] Launcher no-op exit-status expressions → 1.4
-- [ ] Possibly unused `$APP_DIR/lib` runtime path → 1.4
-- [ ] Dead includes/locals → 1.4
-- [ ] Install Update version stored but not rendered correctly → 1.5
-- [ ] Duplicate/inaccurate playback status wording → 1.6
-- [ ] `Choose a song from Home` wording mismatch → 1.7
-- [ ] `Liner Notes` is semantically an About screen → 1.8
-- [ ] Hard-coded music path in app info → 1.8
-- [ ] Stale README updater behavior/terminology → 1.9
+- [x] Legacy `check-requested` launcher path → 1.1
+- [x] Persisted-but-unused `paused` field → 1.2 / 3.5
+- [x] Unused `Disconnected` player event → 1.3
+- [x] Checker `tar` dependency with no use → 1.4
+- [x] Launcher no-op exit-status expressions → 1.4
+- [x] Possibly unused `$APP_DIR/lib` runtime path → 1.4
+- [x] Dead includes/locals → 1.4
+- [x] Install Update version stored but not rendered correctly → 1.5
+- [x] Duplicate/inaccurate playback status wording → 1.6
+- [x] `Choose a song from Home` wording mismatch → 1.7
+- [x] `Liner Notes` is semantically an About screen → 1.8
+- [x] Hard-coded music path in app info → 1.8
+- [x] Stale README updater behavior/terminology → 1.9
 - [ ] `navigation.cpp` owns updater platform/process logic → 2.1
 - [ ] PID leaks into `AppState` → 2.2
 - [ ] Deep/repeated updater `getenv()` path lookup → 2.3

@@ -3,6 +3,7 @@
 #include "app/navigation.hpp"
 #include "ui/layout.hpp"
 void handleKey(AppState& app, SDL_Keycode code) {
+    if (app.updateCheck.active()) return;
     if (app.exitConfirmationOpen) {
         switch (code) {
             case SDLK_LEFT:

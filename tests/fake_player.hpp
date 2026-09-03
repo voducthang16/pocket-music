@@ -6,6 +6,10 @@
 
 class FakePlayer final : public AudioPlayer {
    public:
+    ~FakePlayer() override {
+        if (destructionFlag) *destructionFlag = true;
+    }
+
     uint64_t load(const std::filesystem::path& path) override {
         loadedPath = path;
         ++loadCount;
@@ -45,5 +49,6 @@ class FakePlayer final : public AudioPlayer {
     uint64_t generation = 0;
     bool loadSucceeds = true;
     bool pausedValue = false;
+    bool* destructionFlag = nullptr;
     std::vector<PlayerEvent> events;
 };

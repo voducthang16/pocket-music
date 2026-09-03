@@ -48,7 +48,7 @@ bool PlaybackController::requestLoad(size_t trackIndex, double resumeSeconds, bo
         return false;
     }
     pendingLoad_ = PendingLoad{generation,  trackIndex, std::max(0.0, resumeSeconds),
-                               startPaused, false,      origin};
+                               startPaused, false,      0, origin};
     failedLoad_.reset();
     if (origin != LoadOrigin::Automatic) automaticFailures_ = 0;
     snapshot_.phase = PlaybackPhase::Loading;
@@ -74,6 +74,7 @@ void PlaybackController::handle(const PlayerEvent& event) {
             currentGeneration_ = pendingLoad_->generation;
             snapshot_.trackIndex = pendingLoad_->trackIndex;
             snapshot_.positionSeconds = pendingLoad_->resumeSeconds;
+            snapshot_.durationSeconds = pendingLoad_->durationSeconds;
             snapshot_.phase =
                 pendingLoad_->startPaused ? PlaybackPhase::Paused : PlaybackPhase::Playing;
             snapshot_.seekable = pendingLoad_->seekable;
@@ -88,7 +89,9 @@ void PlaybackController::handle(const PlayerEvent& event) {
                 snapshot_.positionSeconds = std::max(0.0, event.number);
             break;
         case PlayerEventType::DurationChanged:
-            if (snapshot_.phase != PlaybackPhase::Loading) {
+            if (pendingLoad_) {
+                pendingLoad_->durationSeconds = std::max(0.0, event.number);
+            } else {
                 snapshot_.durationSeconds = std::max(0.0, event.number);
                 if (snapshot_.durationSeconds > 0 &&
                     snapshot_.positionSeconds >= snapshot_.durationSeconds) {
@@ -201,6 +204,8 @@ void PlaybackController::retry() {
         sourceTitle_ = failed.sourceTitle;
     }
 }
+
+void PlaybackController::shutdown() { player_.reset(); }
 
 std::optional<size_t> PlaybackController::displayTrackIndex() const {
     if (pendingLoad_) return pendingLoad_->trackIndex;

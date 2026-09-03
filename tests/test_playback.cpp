@@ -37,10 +37,15 @@ void loadLifecycleAndStaleEvents() {
     fixture.controller->update();
     require(fixture.controller->snapshot().phase == PlaybackPhase::Loading,
             "late events from an older generation must be ignored");
+    fixture.player->emit({PlayerEventType::DurationChanged, 2, 337});
+    fixture.player->emit({PlayerEventType::SeekableChanged, 2, 0, true});
     fixture.player->emit({PlayerEventType::FileLoaded, 2});
     fixture.controller->update();
     require(fixture.controller->snapshot().phase == PlaybackPhase::Playing &&
-                fixture.controller->snapshot().trackIndex == 1,
+                fixture.controller->snapshot().durationSeconds == 337 &&
+                fixture.controller->snapshot().seekable,
+            "loading metadata must survive until file-loaded commits the track");
+    require(fixture.controller->snapshot().trackIndex == 1,
             "matching file-loaded must commit the pending track");
 }
 
@@ -193,6 +198,16 @@ void duplicateQueueEntriesArePreserved() {
     require(order == std::vector<size_t>({0, 1, 1, 2}),
             "shuffle must preserve duplicate queue entries");
 }
+
+void shutdownReleasesAudioPlayer() {
+    PlaybackFixture fixture;
+    bool destroyed = false;
+    fixture.player->destructionFlag = &destroyed;
+
+    fixture.controller->shutdown();
+
+    require(destroyed, "explicit shutdown must destroy the audio player immediately");
+}
 }  // namespace
 
 void addPlaybackTests(TestCases& tests) {
@@ -208,4 +223,5 @@ void addPlaybackTests(TestCases& tests) {
     tests.emplace_back("shuffle toggle", togglingShufflePreservesCurrentTrack);
     tests.emplace_back("shuffle wraps", shuffledPlaybackWrapsAfterEveryTrack);
     tests.emplace_back("duplicate queue entries", duplicateQueueEntriesArePreserved);
+    tests.emplace_back("shutdown releases audio player", shutdownReleasesAudioPlayer);
 }

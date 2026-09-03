@@ -126,6 +126,7 @@ int runApplication(const std::filesystem::path& musicPath, const std::filesystem
     }
     buildHomeView(app);
     if (!initializeUi(app, fullscreen)) {
+        app.playback.shutdown();
         destroyUi(app);
         return 1;
     }
@@ -174,6 +175,7 @@ int runApplication(const std::filesystem::path& musicPath, const std::filesystem
         SDL_Delay(16);
     }
     persist(app, statePath);
+    app.playback.shutdown();
     destroyUi(app);
     return 0;
 }

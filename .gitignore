@@ -1,4 +1,5 @@
 /build/
+/build-*/
 /Music/
 /.DS_Store
 /.pocket-music-state

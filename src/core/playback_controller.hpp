@@ -36,6 +36,7 @@ class PlaybackController {
     void next();
     void previous();
     void retry();
+    void shutdown();
     void setShuffle(bool shuffle, uint32_t seed = std::random_device{}());
     void setRepeatMode(RepeatMode mode);
 
@@ -56,6 +57,7 @@ class PlaybackController {
         double resumeSeconds;
         bool startPaused;
         bool seekable = false;
+        double durationSeconds = 0;
         LoadOrigin origin;
     };
 

@@ -79,6 +79,17 @@ printf '%s\n' "$CHECK_OUTPUT" | grep 'ready to install' >/dev/null || fail "read
 [ -f "$DATA/update/pending-update" ] || fail "pending update metadata missing"
 [ "$(cat "$DATA/user-state")" = "preserve-me" ] || fail "check modified persistent data"
 
+PENDING_BEFORE=$(cat "$DATA/update/pending-update")
+set +e
+FAILED_CHECK_OUTPUT=$(POCKET_MUSIC_UPDATE_BASE_URL="file://$TMP/missing-release" \
+  "$CHECKER" "0.1.0" "$APP" "$DATA" 2>&1)
+FAILED_CHECK_STATUS=$?
+set -e
+[ "$FAILED_CHECK_STATUS" -ne 0 ] || fail "missing release must fail the update check"
+[ -f "$DATA/update/pending-update" ] || fail "failed check discarded verified pending update"
+[ "$(cat "$DATA/update/pending-update")" = "$PENDING_BEFORE" ] || \
+  fail "failed check changed verified pending metadata"
+
 APPLY_OUTPUT=$("$APPLIER" "$APP" "$DATA" 2>&1) || {
   printf '%s\n' "$APPLY_OUTPUT" >&2
   fail "verified update did not install"

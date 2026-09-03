@@ -15,7 +15,8 @@ PENDING="$UPDATE_DIR/pending-update"
 }
 
 mkdir -p "$UPDATE_DIR"
-rm -f "$MANIFEST" "$PENDING"
+# Keep an already verified pending update until a new check completes successfully.
+rm -f "$MANIFEST"
 
 need_command() {
   command -v "$1" >/dev/null 2>&1 || {
@@ -92,6 +93,7 @@ case "$SIZE" in
 esac
 
 if ! is_newer_version "$CURRENT_VERSION" "$VERSION"; then
+  rm -f "$PENDING"
   echo "Pocket Music $CURRENT_VERSION is up to date"
   exit 0
 fi

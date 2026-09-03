@@ -115,9 +115,7 @@ void PlaybackController::handle(const PlayerEvent& event) {
             advanceAfterEnd();
             break;
         case PlayerEventType::Failed:
-        case PlayerEventType::Disconnected:
-            if (event.type == PlayerEventType::Failed && pendingLoad_ &&
-                pendingLoad_->origin == LoadOrigin::Automatic &&
+            if (pendingLoad_ && pendingLoad_->origin == LoadOrigin::Automatic &&
                 ++automaticFailures_ < queue_.source().size()) {
                 if (const auto nextTrack = queue_.next(cyclesQueue())) {
                     requestLoad(*nextTrack, 0, false, LoadOrigin::Automatic);

@@ -25,10 +25,18 @@ std::filesystem::path UpdateController::updateDirectory() const {
     return paths_.dataDir.empty() ? std::filesystem::path{} : paths_.dataDir / "update";
 }
 
-void UpdateController::setError(std::string detail) {
-    state_.phase = UpdatePhase::Error;
+void UpdateController::emitNotice(std::string detail) { notice_ = std::move(detail); }
+
+void UpdateController::resetIdle() {
+    state_.phase = UpdatePhase::Idle;
     state_.version.clear();
-    state_.detail = std::move(detail);
+    state_.detail.clear();
+}
+
+std::optional<std::string> UpdateController::takeNotice() {
+    auto notice = std::move(notice_);
+    notice_.reset();
+    return notice;
 }
 
 std::optional<std::string> UpdateController::pendingVersion() const {
@@ -88,15 +96,15 @@ void UpdateController::clearCheckPhaseFile() const {
 bool UpdateController::check() {
     if (state_.checking() || state_.cancelling() || state_.preparingInstall()) return false;
     if (!paths_.available()) {
-        setError("Remote updates are available on TrimUI");
+        emitNotice("Remote updates are available on TrimUI");
         return false;
     }
 
     const auto updateDir = updateDirectory();
     std::error_code filesystemError;
     std::filesystem::create_directories(updateDir, filesystemError);
-    if (filesystemError || access(paths_.checker.c_str(), X_OK) != 0) {
-        setError("Pocket Music updater is unavailable");
+    if (filesystemError || access(paths_.preparer.c_str(), X_OK) != 0) {
+        emitNotice("Pocket Music updater is unavailable");
         return false;
     }
     clearCheckPhaseFile();
@@ -126,24 +134,24 @@ bool UpdateController::check() {
     if (error != 0) {
         if (attributesReady) posix_spawnattr_destroy(&attributes);
         if (actionsReady) posix_spawn_file_actions_destroy(&actions);
-        setError("Could not prepare update check");
+        emitNotice("Could not prepare update check");
         return false;
     }
 
-    const std::string checker = paths_.checker.string();
+    const std::string preparer = paths_.preparer.string();
     const std::string appDir = paths_.appDir.string();
     const std::string dataDir = paths_.dataDir.string();
-    char* arguments[] = {const_cast<char*>(checker.c_str()),
+    char* arguments[] = {const_cast<char*>(preparer.c_str()),
                          const_cast<char*>(POCKET_MUSIC_VERSION),
                          const_cast<char*>(appDir.c_str()),
                          const_cast<char*>(dataDir.c_str()), nullptr};
 
     pid_t pid = -1;
-    error = posix_spawn(&pid, checker.c_str(), &actions, &attributes, arguments, environ);
+    error = posix_spawn(&pid, preparer.c_str(), &actions, &attributes, arguments, environ);
     posix_spawnattr_destroy(&attributes);
     posix_spawn_file_actions_destroy(&actions);
     if (error != 0 || pid <= 0) {
-        setError("Could not start update check");
+        emitNotice("Could not start update check");
         return false;
     }
 
@@ -177,30 +185,28 @@ bool UpdateController::poll() {
 
     if (state_.cancelling()) {
         resetCancellation();
-        state_.phase = UpdatePhase::Idle;
-        state_.version.clear();
-        state_.detail.clear();
+        resetIdle();
         return true;
     }
 
     resetCancellation();
     if (result < 0) {
-        setError("Couldn't check for updates. Try again.");
+        resetIdle();
+        emitNotice("Couldn't check for updates. Try again.");
         return true;
     }
 
     const int exitCode = WIFEXITED(status) ? WEXITSTATUS(status) : 2;
     if (exitCode == 0) {
-        state_.phase = UpdatePhase::UpToDate;
-        state_.version.clear();
-        state_.detail = "Pocket Music is up to date";
+        resetIdle();
+        emitNotice("Pocket Music is up to date");
     } else if (exitCode == 10) {
-        state_.phase = UpdatePhase::Ready;
-        if (const auto version = pendingVersion()) state_.version = *version;
-        state_.detail = state_.version.empty() ? "Update is ready to install"
-                                               : "v" + state_.version + " is ready to install";
+        const auto version = pendingVersion();
+        resetIdle();
+        emitNotice(version ? "v" + *version + " is ready to install" : "Update is ready to install");
     } else {
-        setError("Couldn't check for updates. Check Wi-Fi and try again.");
+        resetIdle();
+        emitNotice("Couldn't check for updates. Check Wi-Fi and try again.");
     }
     return true;
 }
@@ -208,11 +214,7 @@ bool UpdateController::poll() {
 void UpdateController::cancel() {
     if (state_.cancelling()) return;
     if (processId_ <= 0 || !state_.checking()) {
-        if (state_.checking()) {
-            state_.phase = UpdatePhase::Idle;
-            state_.version.clear();
-            state_.detail.clear();
-        }
+        if (state_.checking()) resetIdle();
         return;
     }
 
@@ -228,30 +230,30 @@ bool UpdateController::requestInstall() {
     if (state_.checking() || state_.cancelling() || state_.preparingInstall()) return false;
     const auto updateDir = updateDirectory();
     if (updateDir.empty()) {
-        setError("Remote updates are available on TrimUI");
+        emitNotice("Remote updates are available on TrimUI");
         return false;
     }
     if (!std::filesystem::exists(updateDir / "pending-update")) {
-        setError("No update is ready to install");
+        emitNotice("No update is ready to install");
         return false;
     }
 
     std::error_code error;
     std::filesystem::create_directories(updateDir, error);
     if (error) {
-        setError("Could not prepare update directory");
+        emitNotice("Could not prepare update directory");
         return false;
     }
 
     std::ofstream request(updateDir / "install-requested", std::ios::trunc);
     if (!request) {
-        setError("Could not request update action");
+        emitNotice("Could not request update action");
         return false;
     }
     request << "requested\n";
     request.close();
     if (!request) {
-        setError("Could not save update request");
+        emitNotice("Could not save update request");
         return false;
     }
 
@@ -276,9 +278,7 @@ bool UpdateController::consumeLastStatus() {
     std::filesystem::remove(statusPath, error);
     if (line.empty()) return false;
 
-    state_.phase = UpdatePhase::Result;
-    state_.version.clear();
-    state_.detail = std::move(line);
+    emitNotice(std::move(line));
     return true;
 }
 

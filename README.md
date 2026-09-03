@@ -135,7 +135,7 @@ tagged `v0.2.6`.
 
 ### Remote updates
 
-Select `Check for Updates` from Home. Pocket Music stays open while the update checker runs in the
+Select `Check for Updates` from Home. Pocket Music stays open while the update preparer runs in the
 background. The modal reflects the real preparation phases:
 
 ```text
@@ -146,10 +146,10 @@ Downloading vX.Y.Z...
 Verifying update...
 ```
 
-The checker downloads release metadata and the OTA archive over verified HTTPS, validates the
+The preparer downloads release metadata and the OTA archive over verified HTTPS, validates the
 reported archive size and SHA-256 checksum, and only then exposes `Install Update` on Home. The
 pending version is shown beside the install action. The check can be cancelled with B while the
-network/check process is active.
+update preparation process is active.
 
 Selecting `Install Update` first presents the install handoff modal. Pocket Music renders that
 state before exiting; the launcher then owns the filesystem transaction. Installation preserves
@@ -157,7 +157,7 @@ state before exiting; the launcher then owns the filesystem transaction. Install
 can restore the previous installation after a failed or interrupted update. The launcher restarts
 Pocket Music after the transaction and the app displays the resulting update status.
 
-The check path runs inside the application process lifecycle; the launcher no longer performs a
+The preparation path runs inside the application process lifecycle; the launcher no longer performs a
 second legacy update check after Pocket Music exits. The launcher remains responsible for install
 handoff and interrupted-update recovery.
 
@@ -167,9 +167,11 @@ icon exports.
 
 Native FFmpeg/SDL playback, Home/Songs/Now Playing navigation, controller input, paused session
 restore, transactional OTA installation, in-app update loading phases, and the deferred install
-handoff have been exercised on a TrimUI Brick Hammer. The current update UX was verified with a
-real OTA from v0.2.5 to v0.2.6 without manually copying the application over SSH. Suspend/resume
-behavior and every Stock OS firmware revision are not covered by automated tests.
+handoff have been exercised on a TrimUI Brick Hammer. The released v0.2.6 update UX was verified
+with a real OTA from v0.2.5 to v0.2.6 without manually copying the application over SSH. The
+post-v0.2.6 updater-internal refactor is covered by automated tests and the AArch64 target gate, but
+still requires the final physical Brick smoke test. Suspend/resume behavior and every Stock OS
+firmware revision are not covered by automated tests.
 
 ## Verification
 

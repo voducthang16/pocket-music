@@ -22,9 +22,9 @@ The cleanup is complete when:
 
 - [x] No known legacy updater path remains.
 - [ ] No known persisted-but-unused state remains.
-- [ ] Navigation no longer owns updater process/platform details.
-- [ ] OS process identifiers are not stored in UI/application state.
-- [ ] Update cancellation is non-blocking.
+- [x] Navigation no longer owns updater process/platform details.
+- [x] OS process identifiers are not stored in UI/application state.
+- [x] Update cancellation is non-blocking.
 - [x] Playback status wording is derived from one canonical mapping.
 - [ ] View models do not duplicate track metadata unnecessarily.
 - [ ] SDL/audio lifetime is RAII-driven rather than manually invalidating controller internals.
@@ -184,64 +184,66 @@ src/update/
   update_state.hpp
 ```
 
-- [ ] Move updater path/protocol/process logic out of `navigation.cpp`.
-- [ ] Keep navigation responsible only for user actions and view transitions.
-- [ ] Expose semantic operations such as `check()`, `poll()`, `cancel()`, and `requestInstall()`.
-- [ ] Expose read-only semantic status to the UI.
+- [x] Move updater path/protocol/process logic out of `navigation.cpp`.
+- [x] Keep navigation responsible only for user actions and view transitions.
+- [x] Expose semantic operations such as `check()`, `poll()`, `cancel()`, and `requestInstall()`.
+- [x] Expose read-only semantic status to the UI.
 
 ## 2.2 Remove OS PID from `AppState`
 
 Finding: `UpdateState::processId` leaks process implementation details into application/UI state.
 
-- [ ] Remove `processId` from `UpdateState`.
-- [ ] Store process ownership privately inside `UpdateController`.
-- [ ] UI state must contain only phase/version/detail or a smaller semantic representation.
+- [x] Remove `processId` from `UpdateState`.
+- [x] Store process ownership privately inside `UpdateController`.
+- [x] UI state must contain only phase/version/detail or a smaller semantic representation.
 
 ## 2.3 Introduce explicit runtime/platform paths
 
 Finding: updater code repeatedly reads environment variables (`POCKET_MUSIC_APP_DIR`, `POCKET_MUSIC_DATA_DIR`, checker override) deep inside navigation helpers.
 
-- [ ] Resolve runtime paths once near application startup.
-- [ ] Pass/inject them into the update subsystem.
-- [ ] Keep environment variables at the platform/bootstrap boundary.
-- [ ] Preserve a clean test injection mechanism without production code repeatedly calling `getenv()`.
+- [x] Resolve runtime paths once near application startup.
+- [x] Pass/inject them into the update subsystem.
+- [x] Keep environment variables at the platform/bootstrap boundary.
+- [x] Preserve a clean test injection mechanism without production code repeatedly calling `getenv()`.
 
 ## 2.4 Replace `fork()` + `execl()` with a spawn API
 
 Finding: Pocket Music is multithreaded because the audio backend has a worker thread. A direct `fork()` from that process is avoidable.
 
-- [ ] Replace the checker launch path with `posix_spawn()`/`posix_spawnp()` if supported by the TrimUI toolchain/runtime.
-- [ ] Redirect checker stdout/stderr to the update log using spawn file actions.
-- [ ] Preserve checker process-group cancellation semantics where practical.
-- [ ] Validate the implementation with the actual AArch64 cross-toolchain.
+- [x] Replace the checker launch path with `posix_spawn()`/`posix_spawnp()` if supported by the TrimUI toolchain/runtime.
+- [x] Redirect checker stdout/stderr to the update log using spawn file actions.
+- [x] Preserve checker process-group cancellation semantics where practical.
+- [x] Validate the implementation with the actual AArch64 cross-toolchain.
 
 Acceptance:
 
-- [ ] No `fork()` remains in updater production code.
+- [x] No `fork()` remains in updater production code.
 
 ## 2.5 Make cancellation non-blocking
 
 Finding: current cancel sends SIGTERM and immediately performs a blocking `waitpid(..., 0)` on the SDL/UI thread.
 
-- [ ] Add an explicit cancellation state or cancellation flag.
-- [ ] Send termination without blocking the input handler.
-- [ ] Reap the child from the regular poll path with `WNOHANG`.
-- [ ] Define behavior if the child takes longer than expected to terminate.
-- [ ] Add a cancellation lifecycle test.
+- [x] Add an explicit cancellation state or cancellation flag.
+- [x] Send termination without blocking the input handler.
+- [x] Reap the child from the regular poll path with `WNOHANG`.
+- [x] Define behavior if the child takes longer than expected to terminate.
+- [x] Add a cancellation lifecycle test.
+
+Current cancellation policy: send SIGTERM immediately, keep the UI responsive, and escalate to SIGKILL after a 500 ms grace period if the preparer has not exited. Reaping remains in the regular non-blocking poll path.
 
 Acceptance:
 
-- [ ] The UI loop never blocks waiting for update-check process termination.
+- [x] The UI loop never blocks waiting for update-check process termination.
 
 ## 2.6 Use one canonical pending-update manifest
 
 Finding: downloaded release metadata and `pending-update` duplicate version/asset/checksum information, and pending metadata currently drops size.
 
-- [ ] Define one pending manifest schema containing every field required for install verification.
-- [ ] Write it atomically only after download and verification succeed.
-- [ ] Keep `size` in the verified pending manifest.
-- [ ] Remove redundant intermediate durable metadata where unnecessary.
-- [ ] No backward parser for the previous pending format is required.
+- [x] Define one pending manifest schema containing every field required for install verification.
+- [x] Write it atomically only after download and verification succeed.
+- [x] Keep `size` in the verified pending manifest.
+- [x] Remove redundant intermediate durable metadata where unnecessary.
+- [x] No backward parser for the previous pending format is required.
 
 ## 2.7 Rename backend checker to match its real responsibility
 
@@ -253,46 +255,48 @@ Candidate terminology:
 - backend: `prepare-update.sh`
 - controller: `prepareUpdate()` / `check()` as appropriate
 
-- [ ] Rename the script and package references if the resulting terminology is clearer.
-- [ ] Update Docker packaging, launcher exports, tests, and documentation in the same change.
-- [ ] Do not retain a compatibility copy/symlink under the old script name.
+- [x] Rename the script and package references if the resulting terminology is clearer.
+- [x] Update Docker packaging, launcher exports, tests, and documentation in the same change.
+- [x] Do not retain a compatibility copy/symlink under the old script name.
 
 ## 2.8 Separate update state from transient notices
 
 Finding: completed update status currently remains in `UpdateState`, while generic playback/application errors use `app.message`; renderer owns priority between both channels.
 
-- [ ] Define a small application notice/banner model if banners are still desired.
-- [ ] Let the update subsystem emit a completion notice instead of indefinitely owning banner text.
-- [ ] Give notices an explicit dismissal/lifetime policy or intentionally persistent semantics.
-- [ ] Remove renderer-specific arbitration between unrelated state channels.
+- [x] Define a small application notice/banner model if banners are still desired.
+- [x] Let the update subsystem emit a completion notice instead of indefinitely owning banner text.
+- [x] Give notices an explicit dismissal/lifetime policy or intentionally persistent semantics.
+- [x] Remove renderer-specific arbitration between unrelated state channels.
+
+Current notice policy: notices persist until a newer notice replaces them; update lifecycle state itself returns to `Idle` after emitting completion/error text.
 
 ## 2.9 Deduplicate managed updater paths
 
 Finding: installer knowledge of managed directories/files is repeated across backup/restore/install logic.
 
-- [ ] Define managed directories once.
-- [ ] Define managed files once.
-- [ ] Reuse those definitions for backup, restore, cleanup, and install operations.
-- [ ] Preserve `launch.sh` replacement ordering needed for safe handoff.
+- [x] Define managed directories once.
+- [x] Define managed files once.
+- [x] Reuse those definitions for backup, restore, cleanup, and install operations.
+- [x] Preserve `launch.sh` replacement ordering needed for safe handoff.
 
 ## 2.10 Add launcher orchestration integration coverage
 
 Finding: updater integration tests call checker/applier directly but do not execute the real app-exit → marker → launcher → installer → restart orchestration.
 
-- [ ] Make TrimUI launcher filesystem roots injectable/testable where necessary.
-- [ ] Add an integration fixture for `install-requested` handoff.
-- [ ] Verify launcher consumes the marker.
-- [ ] Verify installer runs and protected data survives.
-- [ ] Verify restart/relaunch behavior without touching real `/mnt/SDCARD` in CI.
+- [x] Make TrimUI launcher filesystem roots injectable/testable where necessary.
+- [x] Add an integration fixture for `install-requested` handoff.
+- [x] Verify launcher consumes the marker.
+- [x] Verify installer runs and protected data survives.
+- [x] Verify restart/relaunch behavior without touching real `/mnt/SDCARD` in CI.
 
 Phase 2 gate:
 
-- [ ] `make format`
-- [ ] `make test`
-- [ ] Shell syntax validation passes.
-- [ ] Full updater integration passes.
-- [ ] `make trimui-package` passes with actual AArch64 toolchain.
-- [ ] No old update protocol compatibility path remains.
+- [x] `make format`
+- [x] `make test`
+- [x] Shell syntax validation passes.
+- [x] Full updater integration passes.
+- [x] `make trimui-package` passes with actual AArch64 toolchain.
+- [x] No old update protocol compatibility path remains.
 
 ---
 
@@ -502,16 +506,16 @@ This index keeps the original audit findings traceable to tasks above.
 - [x] `Liner Notes` is semantically an About screen → 1.8
 - [x] Hard-coded music path in app info → 1.8
 - [x] Stale README updater behavior/terminology → 1.9
-- [ ] `navigation.cpp` owns updater platform/process logic → 2.1
-- [ ] PID leaks into `AppState` → 2.2
-- [ ] Deep/repeated updater `getenv()` path lookup → 2.3
-- [ ] `fork()` in multithreaded SDL/audio process → 2.4
-- [ ] Blocking `waitpid()` on cancel → 2.5
-- [ ] Duplicate updater metadata formats → 2.6
-- [ ] `check-update.sh` name understates behavior → 2.7
-- [ ] Update result state doubles as notification system → 2.8
-- [ ] Managed installer path knowledge repeated → 2.9
-- [ ] Launcher orchestration not integration-tested → 2.10
+- [x] `navigation.cpp` owns updater platform/process logic → 2.1
+- [x] PID leaks into `AppState` → 2.2
+- [x] Deep/repeated updater `getenv()` path lookup → 2.3
+- [x] `fork()` in multithreaded SDL/audio process → 2.4
+- [x] Blocking `waitpid()` on cancel → 2.5
+- [x] Duplicate updater metadata formats → 2.6
+- [x] `check-update.sh` name understates behavior → 2.7
+- [x] Update result state doubles as notification system → 2.8
+- [x] Managed installer path knowledge repeated → 2.9
+- [x] Launcher orchestration not integration-tested → 2.10
 - [ ] Controller input translated through fake keyboard events → 3.1
 - [ ] Generic `ViewItem` duplicates/mixes track and menu data → 3.2
 - [ ] Cached `allTrackIndexes_` identity vector → 3.3

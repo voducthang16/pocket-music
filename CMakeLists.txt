@@ -139,8 +139,10 @@ if(BUILD_TESTING)
     Threads::Threads
   )
 
+  set(SMOKE_MUSIC_DIR "${CMAKE_CURRENT_BINARY_DIR}/smoke-music")
+  file(MAKE_DIRECTORY "${SMOKE_MUSIC_DIR}")
   add_test(NAME unit COMMAND pocket-music-tests)
-  add_test(NAME smoke COMMAND pocket-music --smoke-test --music ${CMAKE_SOURCE_DIR}/Music)
+  add_test(NAME smoke COMMAND pocket-music --smoke-test --music "${SMOKE_MUSIC_DIR}")
 
   add_executable(pocket-music-ffmpeg-integration
     tests/test_ffmpeg_integration.cpp

@@ -16,7 +16,14 @@
 #include "ui/theme.hpp"
 
 enum class Screen { Home, Songs, NowPlaying, About };
-enum class ViewAction { None, OpenSongs, OpenNowPlaying, OpenAbout, CheckForUpdates, InstallUpdate };
+enum class ViewAction {
+    None,
+    OpenSongs,
+    OpenNowPlaying,
+    OpenAbout,
+    CheckForUpdates,
+    InstallUpdate
+};
 
 enum class UpdatePhase {
     Idle,

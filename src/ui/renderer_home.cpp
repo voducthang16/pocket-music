@@ -1,4 +1,5 @@
 #include "ui/layout.hpp"
+#include "ui/presentation.hpp"
 #include "ui/primitives.hpp"
 #include "ui/renderer_internal.hpp"
 
@@ -10,8 +11,9 @@ void drawHomeScreen(AppState& app) {
     const auto& items = app.view.items;
     for (int index = 0; index < static_cast<int>(items.size()); ++index) {
         const int y = layout::contentRowsY + index * layout::contentRowHeight;
+        const auto presentation = homeRowPresentation(items[index]);
         drawHomeRow(app, items[index], index, y, index == app.view.selected,
-                    index == 0 ? items[index].subtitle : "", index > 0);
+                    presentation.chevron);
     }
     drawNowPlayingBand(app);
 }

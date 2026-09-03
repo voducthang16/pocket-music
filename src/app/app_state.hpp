@@ -25,18 +25,32 @@ enum class ViewAction {
     InstallUpdate
 };
 
-enum class UpdateCheckPhase { Idle, Checking, Downloading, Verifying, UpToDate, Ready, Error };
+enum class UpdatePhase {
+    Idle,
+    Checking,
+    Downloading,
+    Verifying,
+    UpToDate,
+    Ready,
+    PreparingInstall,
+    Result,
+    Error
+};
 
-struct UpdateCheckState {
-    UpdateCheckPhase phase = UpdateCheckPhase::Idle;
+struct UpdateState {
+    UpdatePhase phase = UpdatePhase::Idle;
     int processId = -1;
     std::string version;
     std::string detail;
 
-    bool active() const {
-        return phase == UpdateCheckPhase::Checking || phase == UpdateCheckPhase::Downloading ||
-               phase == UpdateCheckPhase::Verifying;
+    bool checking() const {
+        return phase == UpdatePhase::Checking || phase == UpdatePhase::Downloading ||
+               phase == UpdatePhase::Verifying;
     }
+
+    bool preparingInstall() const { return phase == UpdatePhase::PreparingInstall; }
+    bool modalVisible() const { return checking() || preparingInstall(); }
+    bool cancellable() const { return checking(); }
 };
 
 struct ViewItem {
@@ -73,7 +87,7 @@ struct AppState {
     bool exitConfirmationOpen = false;
     int exitConfirmationSelection = 0;
     std::string message;
-    UpdateCheckState updateCheck;
+    UpdateState update;
     std::map<std::string, SDL_Texture*> coverCache;
     std::vector<SDL_GameController*> controllers;
     explicit AppState(std::filesystem::path path, std::unique_ptr<AudioPlayer> audioPlayer =

@@ -55,10 +55,10 @@ void openNowPlaying(AppState& app) {
 bool playTrack(AppState& app, size_t trackIndex, const std::vector<size_t>& queue,
                std::optional<size_t> sourcePosition) {
     if (!app.playback.play(trackIndex, queue, sourcePosition, app.view.title)) {
-        app.message = app.playback.snapshot().errorMessage;
+        app.notice = AppNotice{NoticeSource::Playback, app.playback.snapshot().errorMessage};
         return false;
     }
-    app.message.clear();
+    app.notice.reset();
     openNowPlaying(app);
     return true;
 }
@@ -91,10 +91,12 @@ void selectCurrentItem(AppState& app) {
             pushView(app, {Screen::About, "About", {}, 0, 0});
             return;
         case ViewAction::CheckForUpdates:
-            if (app.updates.check()) app.message.clear();
+            app.notice.reset();
+            app.updates.check();
             return;
         case ViewAction::InstallUpdate:
-            if (app.updates.requestInstall()) app.message.clear();
+            app.notice.reset();
+            app.updates.requestInstall();
             return;
         case ViewAction::None:
             break;
@@ -123,9 +125,12 @@ void navigateBack(AppState& app) {
 void advanceWhenFinished(AppState& app) {
     app.playback.update();
     const auto& playback = app.playback.snapshot();
-    if (playback.phase == PlaybackPhase::Error)
-        app.message = playback.errorMessage;
-    else if (playback.phase == PlaybackPhase::Loading || playback.phase == PlaybackPhase::Playing ||
-             playback.phase == PlaybackPhase::Paused)
-        app.message.clear();
+    if (playback.phase == PlaybackPhase::Error) {
+        if (!app.notice || app.notice->source == NoticeSource::Playback)
+            app.notice = AppNotice{NoticeSource::Playback, playback.errorMessage};
+    } else if ((playback.phase == PlaybackPhase::Loading ||
+                playback.phase == PlaybackPhase::Playing || playback.phase == PlaybackPhase::Paused) &&
+               app.notice && app.notice->source == NoticeSource::Playback) {
+        app.notice.reset();
+    }
 }

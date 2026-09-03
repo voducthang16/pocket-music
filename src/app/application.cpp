@@ -182,6 +182,7 @@ int runApplication(const std::filesystem::path& musicPath, const std::filesystem
             handleControllerButton(app, static_cast<Uint8>(heldButton));
             nextControllerRepeat = SDL_GetTicks64() + 90;
         }
+        pollUpdateCheck(app);
         advanceWhenFinished(app);
         const Uint64 now = SDL_GetTicks64();
         const bool periodicSave =
@@ -194,6 +195,7 @@ int runApplication(const std::filesystem::path& musicPath, const std::filesystem
         renderApp(app);
         SDL_Delay(16);
     }
+    cancelUpdateCheck(app);
     persist(app, statePath);
     app.playback.shutdown();
     destroyUi(app);

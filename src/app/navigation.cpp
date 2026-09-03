@@ -1,9 +1,15 @@
 #include "app/navigation.hpp"
 
 #include <algorithm>
+#include <cerrno>
 #include <cstdlib>
+#include <fcntl.h>
 #include <fstream>
+#include <signal.h>
+#include <string>
 #include <system_error>
+#include <sys/wait.h>
+#include <unistd.h>
 
 namespace {
 ViewItem trackItem(const Track& track, size_t index) {
@@ -22,10 +28,30 @@ void pushView(AppState& app, ViewState next) {
     app.view = std::move(next);
 }
 
-std::optional<std::filesystem::path> updateDirectory() {
+std::optional<std::filesystem::path> dataDirectory() {
     const char* rawDataDir = std::getenv("POCKET_MUSIC_DATA_DIR");
     if (!rawDataDir || !*rawDataDir) return std::nullopt;
-    return std::filesystem::path(rawDataDir) / "update";
+    return std::filesystem::path(rawDataDir);
+}
+
+std::optional<std::filesystem::path> updateDirectory() {
+    const auto dataDir = dataDirectory();
+    if (!dataDir) return std::nullopt;
+    return *dataDir / "update";
+}
+
+std::optional<std::filesystem::path> appDirectory() {
+    const char* rawAppDir = std::getenv("POCKET_MUSIC_APP_DIR");
+    if (!rawAppDir || !*rawAppDir) return std::nullopt;
+    return std::filesystem::path(rawAppDir);
+}
+
+std::optional<std::filesystem::path> updateChecker() {
+    if (const char* rawChecker = std::getenv("POCKET_MUSIC_UPDATE_CHECKER"))
+        if (*rawChecker) return std::filesystem::path(rawChecker);
+    const auto appDir = appDirectory();
+    if (!appDir) return std::nullopt;
+    return *appDir / "update" / "check-update.sh";
 }
 
 std::optional<std::string> pendingUpdateVersion() {
@@ -88,9 +114,49 @@ ViewState homeView(const AppState& app) {
 }
 
 void refreshHomeView(AppState& app) {
+    if (app.view.screen != Screen::Home) return;
     const int selected = app.view.selected;
     app.view = homeView(app);
     app.view.selected = std::clamp(selected, 0, static_cast<int>(app.view.items.size()) - 1);
+}
+
+void readCheckPhase(AppState& app) {
+    const auto updateDir = updateDirectory();
+    if (!updateDir) return;
+
+    std::ifstream phaseFile(*updateDir / "check-phase");
+    if (!phaseFile) return;
+
+    std::string phase;
+    std::string version;
+    std::string line;
+    while (std::getline(phaseFile, line)) {
+        if (line.rfind("phase=", 0) == 0)
+            phase = line.substr(6);
+        else if (line.rfind("version=", 0) == 0)
+            version = line.substr(8);
+    }
+
+    if (!version.empty()) app.updateCheck.version = version;
+    if (phase == "downloading") {
+        app.updateCheck.phase = UpdateCheckPhase::Downloading;
+        app.updateCheck.detail = app.updateCheck.version.empty()
+                                     ? "Downloading update..."
+                                     : "Downloading v" + app.updateCheck.version + "...";
+    } else if (phase == "verifying") {
+        app.updateCheck.phase = UpdateCheckPhase::Verifying;
+        app.updateCheck.detail = "Verifying update...";
+    } else if (phase == "checking") {
+        app.updateCheck.phase = UpdateCheckPhase::Checking;
+        app.updateCheck.detail = "Looking for a new version...";
+    }
+}
+
+void clearCheckPhaseFile() {
+    const auto updateDir = updateDirectory();
+    if (!updateDir) return;
+    std::error_code error;
+    std::filesystem::remove(*updateDir / "check-phase", error);
 }
 }  // namespace
 
@@ -125,7 +191,103 @@ void playAdjacentTrack(AppState& app, int direction) {
 }
 
 bool requestUpdateCheck(AppState& app) {
-    return writeUpdateRequest(app, "check-requested", "Checking for updates...");
+    if (app.updateCheck.active()) return false;
+
+    const auto appDir = appDirectory();
+    const auto dataDir = dataDirectory();
+    const auto updateDir = updateDirectory();
+    const auto checker = updateChecker();
+    if (!appDir || !dataDir || !updateDir || !checker) {
+        app.message = "Remote updates are available on TrimUI";
+        return false;
+    }
+
+    std::error_code error;
+    std::filesystem::create_directories(*updateDir, error);
+    if (error || access(checker->c_str(), X_OK) != 0) {
+        app.updateCheck.phase = UpdateCheckPhase::Error;
+        app.updateCheck.detail = "Pocket Music updater is unavailable";
+        return false;
+    }
+    clearCheckPhaseFile();
+
+    const auto logPath = *updateDir / "update.log";
+    const pid_t pid = fork();
+    if (pid < 0) {
+        app.updateCheck.phase = UpdateCheckPhase::Error;
+        app.updateCheck.detail = "Could not start update check";
+        return false;
+    }
+
+    if (pid == 0) {
+        setpgid(0, 0);
+        const int logFd = open(logPath.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        if (logFd >= 0) {
+            dup2(logFd, STDOUT_FILENO);
+            dup2(logFd, STDERR_FILENO);
+            close(logFd);
+        }
+        execl(checker->c_str(), checker->c_str(), POCKET_MUSIC_VERSION, appDir->c_str(),
+              dataDir->c_str(), static_cast<char*>(nullptr));
+        _exit(127);
+    }
+
+    setpgid(pid, pid);
+    app.message.clear();
+    app.updateCheck.phase = UpdateCheckPhase::Checking;
+    app.updateCheck.processId = static_cast<int>(pid);
+    app.updateCheck.version.clear();
+    app.updateCheck.detail = "Looking for a new version...";
+    return true;
+}
+
+void pollUpdateCheck(AppState& app) {
+    if (!app.updateCheck.active() || app.updateCheck.processId <= 0) return;
+
+    readCheckPhase(app);
+
+    int status = 0;
+    const pid_t pid = static_cast<pid_t>(app.updateCheck.processId);
+    const pid_t result = waitpid(pid, &status, WNOHANG);
+    if (result == 0) return;
+
+    app.updateCheck.processId = -1;
+    clearCheckPhaseFile();
+
+    if (result < 0) {
+        app.updateCheck.phase = UpdateCheckPhase::Error;
+        app.updateCheck.detail = "Couldn't check for updates. Try again.";
+        refreshHomeView(app);
+        return;
+    }
+
+    const int exitCode = WIFEXITED(status) ? WEXITSTATUS(status) : 2;
+    if (exitCode == 0) {
+        app.updateCheck.phase = UpdateCheckPhase::UpToDate;
+        app.updateCheck.version.clear();
+        app.updateCheck.detail = "Pocket Music is up to date";
+    } else if (exitCode == 10) {
+        app.updateCheck.phase = UpdateCheckPhase::Ready;
+        if (const auto version = pendingUpdateVersion()) app.updateCheck.version = *version;
+        app.updateCheck.detail = app.updateCheck.version.empty()
+                                     ? "Update is ready to install"
+                                     : "v" + app.updateCheck.version + " is ready to install";
+    } else {
+        app.updateCheck.phase = UpdateCheckPhase::Error;
+        app.updateCheck.detail = "Couldn't check for updates. Check your Wi-Fi and try again.";
+    }
+    refreshHomeView(app);
+}
+
+void cancelUpdateCheck(AppState& app) {
+    if (app.updateCheck.processId > 0) {
+        const pid_t pid = static_cast<pid_t>(app.updateCheck.processId);
+        kill(-pid, SIGTERM);
+        waitpid(pid, nullptr, 0);
+    }
+    app.updateCheck.processId = -1;
+    if (app.updateCheck.active()) app.updateCheck.phase = UpdateCheckPhase::Idle;
+    clearCheckPhaseFile();
 }
 
 bool requestUpdateInstall(AppState& app) {

@@ -8,6 +8,7 @@ UPDATE_DIR="$DATA_DIR/update"
 BASE_URL=${POCKET_MUSIC_UPDATE_BASE_URL:-https://github.com/voducthang16/pocket-music/releases/latest/download}
 MANIFEST="$UPDATE_DIR/pocket-music-update.txt"
 PENDING="$UPDATE_DIR/pending-update"
+PHASE_FILE="$UPDATE_DIR/check-phase"
 CA_BUNDLE="$APP_DIR/certs/ca-certificates.crt"
 
 [ -d "$APP_DIR" ] || {
@@ -18,6 +19,19 @@ CA_BUNDLE="$APP_DIR/certs/ca-certificates.crt"
 mkdir -p "$UPDATE_DIR"
 # Keep an already verified pending update until a new check completes successfully.
 rm -f "$MANIFEST"
+
+write_phase() {
+  phase=$1
+  version=${2:-}
+  {
+    printf 'phase=%s\n' "$phase"
+    if [ -n "$version" ]; then
+      printf 'version=%s\n' "$version"
+    fi
+  } > "$PHASE_FILE"
+}
+
+write_phase checking
 
 [ -f "$CA_BUNDLE" ] || {
   echo "Pocket Music CA bundle is missing" >&2
@@ -32,9 +46,9 @@ need_command() {
 }
 
 if command -v curl >/dev/null 2>&1; then
-  download() { curl --cacert "$CA_BUNDLE" -fL --connect-timeout 10 --max-time 180 -o "$2" "$1"; }
+  download() { curl --cacert "$CA_BUNDLE" -fsSL --connect-timeout 10 --max-time 180 -o "$2" "$1"; }
 elif command -v wget >/dev/null 2>&1; then
-  download() { SSL_CERT_FILE="$CA_BUNDLE" wget -O "$2" "$1"; }
+  download() { SSL_CERT_FILE="$CA_BUNDLE" wget -q -O "$2" "$1"; }
 else
   echo "Neither curl nor wget is available" >&2
   exit 2
@@ -106,8 +120,10 @@ fi
 
 ARCHIVE="$UPDATE_DIR/$ASSET"
 rm -f "$ARCHIVE"
+write_phase downloading "$VERSION"
 download "$BASE_URL/$ASSET" "$ARCHIVE"
 
+write_phase verifying "$VERSION"
 ACTUAL_SIZE=$(wc -c < "$ARCHIVE" | tr -d ' ')
 [ "$ACTUAL_SIZE" = "$SIZE" ] || {
   echo "Update size verification failed" >&2

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(pocket_music VERSION 0.2.2 LANGUAGES CXX)
+project(pocket_music VERSION 0.2.3 LANGUAGES CXX)
 
 option(POCKET_MUSIC_TRIMUI "Build for TrimUI Stock OS" OFF)
 
@@ -131,6 +131,7 @@ if(BUILD_TESTING)
     src/ui/vinyl.cpp
   )
   target_include_directories(pocket-music-tests PRIVATE src)
+  target_compile_definitions(pocket-music-tests PRIVATE POCKET_MUSIC_VERSION="${PROJECT_VERSION}")
   target_compile_options(pocket-music-tests PRIVATE -Wall -Wextra -Wpedantic)
   target_link_libraries(pocket-music-tests PRIVATE
     TagLib::tag

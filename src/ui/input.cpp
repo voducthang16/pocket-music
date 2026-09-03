@@ -3,6 +3,10 @@
 #include "app/navigation.hpp"
 #include "ui/layout.hpp"
 void handleKey(AppState& app, SDL_Keycode code) {
+    if (app.updateCheck.active()) {
+        if (code == SDLK_ESCAPE || code == SDLK_b) cancelUpdateCheck(app);
+        return;
+    }
     if (app.exitConfirmationOpen) {
         switch (code) {
             case SDLK_LEFT:

@@ -1,9 +1,58 @@
 #include "ui/renderer.hpp"
 
+#include <cmath>
+
 #include "ui/layout.hpp"
 #include "ui/primitives.hpp"
 #include "ui/renderer_internal.hpp"
 #include "ui/vinyl.hpp"
+
+namespace {
+void drawUpdateSpinner(AppState& app, int centerX, int centerY, Uint64 now) {
+    constexpr int segments = 12;
+    constexpr float pi = 3.14159265358979323846f;
+    const int head = static_cast<int>((now / 85) % segments);
+    for (int index = 0; index < segments; ++index) {
+        const float angle = (static_cast<float>(index) / segments) * 2.0f * pi;
+        const int distance = (index - head + segments) % segments;
+        SDL_Color color = app.theme.accent;
+        color.a = static_cast<Uint8>(235 - distance * 14);
+        SDL_SetRenderDrawColor(app.renderer, color.r, color.g, color.b, color.a);
+        const int x1 = centerX + static_cast<int>(std::cos(angle) * 15.0f);
+        const int y1 = centerY + static_cast<int>(std::sin(angle) * 15.0f);
+        const int x2 = centerX + static_cast<int>(std::cos(angle) * 25.0f);
+        const int y2 = centerY + static_cast<int>(std::sin(angle) * 25.0f);
+        SDL_RenderDrawLine(app.renderer, x1, y1, x2, y2);
+    }
+}
+
+void drawUpdateCheckModal(AppState& app, Uint64 now) {
+    if (!app.updateCheck.active()) return;
+
+    SDL_Color dim = app.theme.text;
+    dim.a = 44;
+    fillRect(app.renderer, {0, 0, layout::width, layout::height}, dim);
+
+    const SDL_Rect card{252, 270, 520, 214};
+    SDL_Color surface = app.theme.surfaceRaised;
+    surface.a = 248;
+    fillRoundedRect(app.renderer, card, 18, surface);
+
+    const int centerX = card.x + card.w / 2;
+    drawUpdateSpinner(app, centerX, card.y + 55, now);
+    drawText(app.renderer, app.bodyFont, "Checking for Updates", centerX, card.y + 91,
+             app.theme.text, card.w - 64, true);
+    drawText(app.renderer, app.smallFont, app.updateCheck.detail, centerX, card.y + 139,
+             app.theme.accent, card.w - 64, true);
+    drawText(app.renderer, app.smallFont, "B / Back to cancel", centerX, card.y + 172,
+             app.theme.textMuted, card.w - 64, true);
+}
+
+std::string updateResultMessage(const AppState& app) {
+    if (app.updateCheck.active() || app.updateCheck.phase == UpdateCheckPhase::Idle) return {};
+    return app.updateCheck.detail;
+}
+}  // namespace
 
 void renderApp(AppState& app) {
     const Uint64 now = SDL_GetTicks64();
@@ -24,16 +73,20 @@ void renderApp(AppState& app) {
         drawLinerNotesScreen(app);
     else
         drawSongsScreen(app);
-    if (!app.message.empty() && app.view.screen != Screen::NowPlaying) {
+
+    const std::string updateMessage = updateResultMessage(app);
+    const std::string& bannerMessage = updateMessage.empty() ? app.message : updateMessage;
+    if (!bannerMessage.empty() && app.view.screen != Screen::NowPlaying && !app.updateCheck.active()) {
         const SDL_Rect banner{layout::messageBannerX, layout::messageBannerY,
                               layout::messageBannerWidth, layout::messageBannerHeight};
         SDL_Color surface = app.theme.surfaceRaised;
         surface.a = 220;
         fillRoundedRect(app.renderer, banner, 12, surface);
-        drawText(app.renderer, app.smallFont, app.message, banner.x + 18, banner.y + 10,
+        drawText(app.renderer, app.smallFont, bannerMessage, banner.x + 18, banner.y + 10,
                  app.theme.accent, banner.w - 36);
     }
     if (app.exitConfirmationOpen) drawExitConfirmation(app);
     drawButtonHints(app);
+    drawUpdateCheckModal(app, now);
     SDL_RenderPresent(app.renderer);
 }

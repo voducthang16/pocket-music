@@ -25,6 +25,20 @@ enum class ViewAction {
     InstallUpdate
 };
 
+enum class UpdateCheckPhase { Idle, Checking, Downloading, Verifying, UpToDate, Ready, Error };
+
+struct UpdateCheckState {
+    UpdateCheckPhase phase = UpdateCheckPhase::Idle;
+    int processId = -1;
+    std::string version;
+    std::string detail;
+
+    bool active() const {
+        return phase == UpdateCheckPhase::Checking || phase == UpdateCheckPhase::Downloading ||
+               phase == UpdateCheckPhase::Verifying;
+    }
+};
+
 struct ViewItem {
     std::string title;
     std::string subtitle;
@@ -59,6 +73,7 @@ struct AppState {
     bool exitConfirmationOpen = false;
     int exitConfirmationSelection = 0;
     std::string message;
+    UpdateCheckState updateCheck;
     std::map<std::string, SDL_Texture*> coverCache;
     std::vector<SDL_GameController*> controllers;
     explicit AppState(std::filesystem::path path, std::unique_ptr<AudioPlayer> audioPlayer =

@@ -22,6 +22,58 @@ void pushView(AppState& app, ViewState next) {
     app.view = std::move(next);
 }
 
+std::optional<std::filesystem::path> updateDirectory() {
+    const char* rawDataDir = std::getenv("POCKET_MUSIC_DATA_DIR");
+    if (!rawDataDir || !*rawDataDir) return std::nullopt;
+    return std::filesystem::path(rawDataDir) / "update";
+}
+
+std::optional<std::string> pendingUpdateVersion() {
+    const auto updateDir = updateDirectory();
+    if (!updateDir) return std::nullopt;
+
+    std::ifstream pending(*updateDir / "pending-update");
+    if (!pending) return std::nullopt;
+
+    std::string line;
+    while (std::getline(pending, line)) {
+        constexpr const char* prefix = "version=";
+        if (line.rfind(prefix, 0) == 0 && line.size() > 8) return line.substr(8);
+    }
+    return std::nullopt;
+}
+
+bool writeUpdateRequest(AppState& app, const char* filename, const char* successMessage) {
+    const auto updateDir = updateDirectory();
+    if (!updateDir) {
+        app.message = "Remote updates are available on TrimUI";
+        return false;
+    }
+
+    std::error_code error;
+    std::filesystem::create_directories(*updateDir, error);
+    if (error) {
+        app.message = "Could not prepare update directory";
+        return false;
+    }
+
+    std::ofstream request(*updateDir / filename, std::ios::trunc);
+    if (!request) {
+        app.message = "Could not request update action";
+        return false;
+    }
+    request << "requested\n";
+    request.close();
+    if (!request) {
+        app.message = "Could not save update request";
+        return false;
+    }
+
+    app.message = successMessage;
+    app.running = false;
+    return true;
+}
+
 ViewState homeView(const AppState& app) {
     ViewState view{Screen::Home, "Home", {}, 0, 0};
     view.items = {
@@ -29,6 +81,9 @@ ViewState homeView(const AppState& app) {
         {"Now Playing", "", ViewAction::OpenNowPlaying, std::nullopt},
         {"Liner Notes", "", ViewAction::OpenLinerNotes, std::nullopt},
         {"Check for Updates", "", ViewAction::CheckForUpdates, std::nullopt}};
+    if (const auto version = pendingUpdateVersion())
+        view.items.push_back(
+            {"Install Update", "v" + *version, ViewAction::InstallUpdate, std::nullopt});
     return view;
 }
 
@@ -70,35 +125,20 @@ void playAdjacentTrack(AppState& app, int direction) {
 }
 
 bool requestUpdateCheck(AppState& app) {
-    const char* rawDataDir = std::getenv("POCKET_MUSIC_DATA_DIR");
-    if (!rawDataDir || !*rawDataDir) {
+    return writeUpdateRequest(app, "check-requested", "Checking for updates...");
+}
+
+bool requestUpdateInstall(AppState& app) {
+    const auto updateDir = updateDirectory();
+    if (!updateDir) {
         app.message = "Remote updates are available on TrimUI";
         return false;
     }
-
-    const std::filesystem::path updateDir = std::filesystem::path(rawDataDir) / "update";
-    std::error_code error;
-    std::filesystem::create_directories(updateDir, error);
-    if (error) {
-        app.message = "Could not prepare update directory";
+    if (!std::filesystem::exists(*updateDir / "pending-update")) {
+        app.message = "No update is ready to install";
         return false;
     }
-
-    std::ofstream request(updateDir / "check-requested", std::ios::trunc);
-    if (!request) {
-        app.message = "Could not request update check";
-        return false;
-    }
-    request << "check\n";
-    request.close();
-    if (!request) {
-        app.message = "Could not save update request";
-        return false;
-    }
-
-    app.message = "Checking for updates...";
-    app.running = false;
-    return true;
+    return writeUpdateRequest(app, "install-requested", "Installing update...");
 }
 
 void selectCurrentItem(AppState& app) {
@@ -119,6 +159,9 @@ void selectCurrentItem(AppState& app) {
             return;
         case ViewAction::CheckForUpdates:
             requestUpdateCheck(app);
+            return;
+        case ViewAction::InstallUpdate:
+            requestUpdateInstall(app);
             return;
         case ViewAction::None:
             break;

@@ -5,9 +5,14 @@ CURRENT_VERSION=${1:?current version required}
 APP_DIR=${2:?app dir required}
 DATA_DIR=${3:?data dir required}
 UPDATE_DIR="$DATA_DIR/update"
-BASE_URL="https://github.com/voducthang16/pocket-music/releases/latest/download"
+BASE_URL=${POCKET_MUSIC_UPDATE_BASE_URL:-https://github.com/voducthang16/pocket-music/releases/latest/download}
 MANIFEST="$UPDATE_DIR/pocket-music-update.txt"
 PENDING="$UPDATE_DIR/pending-update"
+
+[ -d "$APP_DIR" ] || {
+  echo "Pocket Music app directory is missing" >&2
+  exit 2
+}
 
 mkdir -p "$UPDATE_DIR"
 rm -f "$MANIFEST" "$PENDING"
@@ -44,11 +49,12 @@ valid_version() {
 
 is_newer_version() {
   awk -v current="$1" -v latest="$2" 'BEGIN {
-    split(current, c, "."); split(latest, l, ".");
-    n = (length(c) > length(l) ? length(c) : length(l));
+    nc = split(current, c, ".");
+    nl = split(latest, l, ".");
+    n = (nc > nl ? nc : nl);
     for (i = 1; i <= n; ++i) {
-      cv = (c[i] == "" ? 0 : c[i] + 0);
-      lv = (l[i] == "" ? 0 : l[i] + 0);
+      cv = (i <= nc ? c[i] + 0 : 0);
+      lv = (i <= nl ? l[i] + 0 : 0);
       if (lv > cv) exit 0;
       if (lv < cv) exit 1;
     }

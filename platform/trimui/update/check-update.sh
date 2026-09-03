@@ -35,6 +35,13 @@ field() {
   sed -n "s/^$1=//p" "$MANIFEST" | head -n 1
 }
 
+valid_version() {
+  awk -v version="$1" 'BEGIN {
+    if (version !~ /^[0-9]+(\.[0-9]+)*$/) exit 1;
+    exit 0;
+  }'
+}
+
 is_newer_version() {
   awk -v current="$1" -v latest="$2" 'BEGIN {
     split(current, c, "."); split(latest, l, ".");
@@ -56,15 +63,24 @@ ASSET=$(field asset)
 SHA256=$(field sha256)
 SIZE=$(field size)
 
-case "$VERSION" in
-  ''|*[!0-9.]*) echo "Invalid update version" >&2; exit 2 ;;
-esac
+valid_version "$CURRENT_VERSION" || {
+  echo "Invalid installed version" >&2
+  exit 2
+}
+valid_version "$VERSION" || {
+  echo "Invalid update version" >&2
+  exit 2
+}
 case "$ASSET" in
   ''|*/*|*\\*) echo "Invalid update asset" >&2; exit 2 ;;
 esac
 case "$SHA256" in
   ''|*[!0-9a-fA-F]*) echo "Invalid update checksum" >&2; exit 2 ;;
 esac
+[ "${#SHA256}" -eq 64 ] || {
+  echo "Invalid update checksum" >&2
+  exit 2
+}
 case "$SIZE" in
   ''|*[!0-9]*) echo "Invalid update size" >&2; exit 2 ;;
 esac

@@ -105,7 +105,7 @@ ViewState homeView(const AppState& app) {
     view.items = {
         {"Songs", std::to_string(app.library.tracks().size()), ViewAction::OpenSongs, std::nullopt},
         {"Now Playing", "", ViewAction::OpenNowPlaying, std::nullopt},
-        {"Liner Notes", "", ViewAction::OpenLinerNotes, std::nullopt},
+        {"About", "", ViewAction::OpenAbout, std::nullopt},
         {"Check for Updates", "", ViewAction::CheckForUpdates, std::nullopt}};
     if (const auto version = pendingUpdateVersion())
         view.items.push_back(
@@ -147,7 +147,7 @@ void readCheckPhase(AppState& app) {
         app.update.detail = "Verifying update...";
     } else if (phase == "checking") {
         app.update.phase = UpdatePhase::Checking;
-        app.update.detail = "Looking for a new version...";
+        app.update.detail = "Looking for updates...";
     }
 }
 
@@ -237,7 +237,7 @@ bool requestUpdateCheck(AppState& app) {
     app.update.phase = UpdatePhase::Checking;
     app.update.processId = static_cast<int>(pid);
     app.update.version.clear();
-    app.update.detail = "Looking for a new version...";
+    app.update.detail = "Looking for updates...";
     return true;
 }
 
@@ -273,7 +273,7 @@ void pollUpdateCheck(AppState& app) {
                                                        : "v" + app.update.version + " is ready to install";
     } else {
         app.update.phase = UpdatePhase::Error;
-        app.update.detail = "Couldn't check for updates. Check your Wi-Fi and try again.";
+        app.update.detail = "Couldn't check for updates. Check Wi-Fi and try again.";
     }
     refreshHomeView(app);
 }
@@ -333,8 +333,8 @@ void selectCurrentItem(AppState& app) {
         case ViewAction::OpenNowPlaying:
             openNowPlaying(app);
             return;
-        case ViewAction::OpenLinerNotes:
-            pushView(app, {Screen::LinerNotes, "Liner Notes", {}, 0, 0});
+        case ViewAction::OpenAbout:
+            pushView(app, {Screen::About, "About", {}, 0, 0});
             return;
         case ViewAction::CheckForUpdates:
             requestUpdateCheck(app);

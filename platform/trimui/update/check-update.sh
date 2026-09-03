@@ -8,6 +8,7 @@ UPDATE_DIR="$DATA_DIR/update"
 BASE_URL=${POCKET_MUSIC_UPDATE_BASE_URL:-https://github.com/voducthang16/pocket-music/releases/latest/download}
 MANIFEST="$UPDATE_DIR/pocket-music-update.txt"
 PENDING="$UPDATE_DIR/pending-update"
+CA_BUNDLE="$APP_DIR/certs/ca-certificates.crt"
 
 [ -d "$APP_DIR" ] || {
   echo "Pocket Music app directory is missing" >&2
@@ -18,6 +19,11 @@ mkdir -p "$UPDATE_DIR"
 # Keep an already verified pending update until a new check completes successfully.
 rm -f "$MANIFEST"
 
+[ -f "$CA_BUNDLE" ] || {
+  echo "Pocket Music CA bundle is missing" >&2
+  exit 2
+}
+
 need_command() {
   command -v "$1" >/dev/null 2>&1 || {
     echo "Missing required command: $1" >&2
@@ -26,9 +32,9 @@ need_command() {
 }
 
 if command -v curl >/dev/null 2>&1; then
-  download() { curl -fL --connect-timeout 10 --max-time 180 -o "$2" "$1"; }
+  download() { curl --cacert "$CA_BUNDLE" -fL --connect-timeout 10 --max-time 180 -o "$2" "$1"; }
 elif command -v wget >/dev/null 2>&1; then
-  download() { wget -O "$2" "$1"; }
+  download() { SSL_CERT_FILE="$CA_BUNDLE" wget -O "$2" "$1"; }
 else
   echo "Neither curl nor wget is available" >&2
   exit 2

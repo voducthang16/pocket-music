@@ -40,7 +40,7 @@ restore_backup() {
     return 2
   }
 
-  for path in bin assets update; do
+  for path in bin assets certs update; do
     rm -rf "$APP_DIR/$path"
     if [ -e "$BACKUP/$path" ]; then
       cp -Rp "$BACKUP/$path" "$APP_DIR/$path"
@@ -146,20 +146,24 @@ NEW_ROOT="$STAGE/PocketMusic"
   echo "Update does not contain config.json" >&2
   exit 2
 }
+[ -f "$NEW_ROOT/certs/ca-certificates.crt" ] || {
+  echo "Update does not contain CA certificates" >&2
+  exit 2
+}
 [ -f "$NEW_ROOT/update/apply-update.sh" ] || {
   echo "Update does not contain updater scripts" >&2
   exit 2
 }
 
 # Prepare a complete replacement tree while the live app is still untouched.
-for path in bin assets icon.png config.json launch.sh update; do
+for path in bin assets certs icon.png config.json launch.sh update; do
   if [ -e "$NEW_ROOT/$path" ]; then
     cp -Rp "$NEW_ROOT/$path" "$PREPARED/$path"
   fi
 done
 
 # Build a complete recovery backup before marking the transaction in progress.
-for path in bin assets icon.png config.json launch.sh update; do
+for path in bin assets certs icon.png config.json launch.sh update; do
   if [ -e "$APP_DIR/$path" ]; then
     cp -Rp "$APP_DIR/$path" "$BACKUP/$path"
   fi
@@ -188,7 +192,7 @@ trap 'exit 2' HUP INT TERM
 
 # Directories may briefly be absent, but launch.sh remains present and the recovery marker
 # lets the launcher restore the backup after an unexpected reboot.
-for path in bin assets update; do
+for path in bin assets certs update; do
   rm -rf "$APP_DIR/$path"
   if [ -e "$PREPARED/$path" ]; then
     mv "$PREPARED/$path" "$APP_DIR/$path"

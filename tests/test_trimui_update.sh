@@ -30,9 +30,10 @@ EOF
 populate_app() {
   app=$1
   version=$2
-  mkdir -p "$app/assets" "$app/update" "$app/data"
+  mkdir -p "$app/assets" "$app/certs" "$app/update" "$app/data"
   write_fake_binary "$app/bin/pocket-music" "$version"
   printf 'assets-%s\n' "$version" > "$app/assets/version.txt"
+  printf 'test-ca-bundle-%s\n' "$version" > "$app/certs/ca-certificates.crt"
   printf '{}\n' > "$app/config.json"
   printf 'icon-%s\n' "$version" > "$app/icon.png"
   cp "$ROOT/platform/trimui/launch.sh" "$app/launch.sh"
@@ -47,6 +48,18 @@ NEW_ROOT="$TMP/new/PocketMusic"
 mkdir -p "$RELEASES"
 populate_app "$APP" "0.1.0"
 printf 'preserve-me\n' > "$DATA/user-state"
+
+REAL_CURL=$(command -v curl)
+FAKE_BIN="$TMP/bin"
+CURL_ARGS="$TMP/curl-args"
+mkdir -p "$FAKE_BIN"
+cat > "$FAKE_BIN/curl" <<EOF
+#!/bin/sh
+printf '%s\n' "\$@" >> "$CURL_ARGS"
+exec "$REAL_CURL" "\$@"
+EOF
+chmod +x "$FAKE_BIN/curl"
+export PATH="$FAKE_BIN:$PATH"
 
 populate_app "$NEW_ROOT" "0.2.0"
 rm -rf "$NEW_ROOT/data"
@@ -76,6 +89,9 @@ CHECK_STATUS=$?
 set -e
 [ "$CHECK_STATUS" -eq 10 ] || fail "new update must return ready status"
 printf '%s\n' "$CHECK_OUTPUT" | grep 'ready to install' >/dev/null || fail "ready result missing"
+grep -F -- '--cacert' "$CURL_ARGS" >/dev/null || fail "curl must use the packaged CA bundle"
+grep -F -- "$APP/certs/ca-certificates.crt" "$CURL_ARGS" >/dev/null || \
+  fail "curl must use the app CA bundle path"
 [ -f "$DATA/update/pending-update" ] || fail "pending update metadata missing"
 [ "$(cat "$DATA/user-state")" = "preserve-me" ] || fail "check modified persistent data"
 
@@ -95,6 +111,8 @@ APPLY_OUTPUT=$("$APPLIER" "$APP" "$DATA" 2>&1) || {
   fail "verified update did not install"
 }
 [ "$("$APP/bin/pocket-music" --version)" = "0.2.0" ] || fail "installed version mismatch"
+[ "$(cat "$APP/certs/ca-certificates.crt")" = "test-ca-bundle-0.2.0" ] || \
+  fail "install did not replace CA bundle"
 [ "$(cat "$DATA/user-state")" = "preserve-me" ] || fail "install modified persistent data"
 [ ! -f "$DATA/update/update-in-progress" ] || fail "success left recovery marker"
 [ ! -f "$DATA/update/pending-update" ] || fail "success left pending update"
@@ -105,14 +123,14 @@ populate_app "$RECOVERY_APP" "0.1.0"
 printf 'recover-me\n' > "$RECOVERY_DATA/user-state"
 BACKUP="$RECOVERY_DATA/update/backup"
 mkdir -p "$BACKUP"
-for path in bin assets icon.png config.json launch.sh update; do
+for path in bin assets certs icon.png config.json launch.sh update; do
   if [ -e "$RECOVERY_APP/$path" ]; then
     cp -Rp "$RECOVERY_APP/$path" "$BACKUP/$path"
   fi
 done
 printf 'version=0.2.0\n' > "$RECOVERY_DATA/update/update-in-progress"
-rm -rf "$RECOVERY_APP/bin" "$RECOVERY_APP/assets" "$RECOVERY_APP/update"
-mkdir -p "$RECOVERY_APP/bin" "$RECOVERY_APP/assets" "$RECOVERY_APP/update"
+rm -rf "$RECOVERY_APP/bin" "$RECOVERY_APP/assets" "$RECOVERY_APP/certs" "$RECOVERY_APP/update"
+mkdir -p "$RECOVERY_APP/bin" "$RECOVERY_APP/assets" "$RECOVERY_APP/certs" "$RECOVERY_APP/update"
 printf 'partial\n' > "$RECOVERY_APP/bin/partial-file"
 printf 'partial\n' > "$RECOVERY_APP/config.json"
 printf '#!/bin/sh\nexit 99\n' > "$RECOVERY_APP/launch.sh"
@@ -123,6 +141,8 @@ RECOVERY_OUTPUT=$("$APPLIER" --recover "$RECOVERY_APP" "$RECOVERY_DATA" 2>&1) ||
   fail "interrupted update did not recover"
 }
 [ "$("$RECOVERY_APP/bin/pocket-music" --version)" = "0.1.0" ] || fail "recovery version mismatch"
+[ "$(cat "$RECOVERY_APP/certs/ca-certificates.crt")" = "test-ca-bundle-0.1.0" ] || \
+  fail "recovery did not restore CA bundle"
 [ "$(cat "$RECOVERY_DATA/user-state")" = "recover-me" ] || fail "recovery modified persistent data"
 [ ! -f "$RECOVERY_DATA/update/update-in-progress" ] || fail "recovery marker was not cleared"
 

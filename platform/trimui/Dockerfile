@@ -74,8 +74,9 @@ RUN cmake -S /src -B /tmp/pocket-music-build \
     && cmake --build /tmp/pocket-music-build -j4 \
     && ${CROSS_COMPILE}strip /tmp/pocket-music-build/pocket-music
 
-RUN mkdir -p /package/PocketMusic/assets/fonts /package/PocketMusic/bin /package/PocketMusic/data /package/PocketMusic/update \
+RUN mkdir -p /package/PocketMusic/assets/fonts /package/PocketMusic/bin /package/PocketMusic/certs /package/PocketMusic/data /package/PocketMusic/update \
     && cp /tmp/pocket-music-build/pocket-music /package/PocketMusic/bin/ \
+    && cp /etc/ssl/certs/ca-certificates.crt /package/PocketMusic/certs/ \
     && cp /src/assets/fonts/NotoSans-Regular.ttf /package/PocketMusic/assets/fonts/ \
     && cp /src/assets/background-hello-kitty-v6.png /package/PocketMusic/assets/ \
     && cp /src/assets/fallback-vinyl.png /package/PocketMusic/assets/ \

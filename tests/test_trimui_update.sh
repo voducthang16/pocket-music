@@ -81,6 +81,8 @@ UP_TO_DATE_STATUS=$?
 set -e
 [ "$UP_TO_DATE_STATUS" -eq 0 ] || fail "newer installed version must not downgrade"
 printf '%s\n' "$UP_TO_DATE_OUTPUT" | grep 'up to date' >/dev/null || fail "up-to-date result missing"
+grep -Fx 'phase=checking' "$DATA/update/check-phase" >/dev/null || \
+  fail "checker did not report checking phase"
 
 set +e
 CHECK_OUTPUT=$(POCKET_MUSIC_UPDATE_BASE_URL="file://$RELEASES" \
@@ -89,6 +91,10 @@ CHECK_STATUS=$?
 set -e
 [ "$CHECK_STATUS" -eq 10 ] || fail "new update must return ready status"
 printf '%s\n' "$CHECK_OUTPUT" | grep 'ready to install' >/dev/null || fail "ready result missing"
+grep -Fx 'phase=verifying' "$DATA/update/check-phase" >/dev/null || \
+  fail "checker did not report verification phase"
+grep -Fx 'version=0.2.0' "$DATA/update/check-phase" >/dev/null || \
+  fail "checker phase did not report update version"
 grep -F -- '--cacert' "$CURL_ARGS" >/dev/null || fail "curl must use the packaged CA bundle"
 grep -F -- "$APP/certs/ca-certificates.crt" "$CURL_ARGS" >/dev/null || \
   fail "curl must use the app CA bundle path"
@@ -102,6 +108,8 @@ FAILED_CHECK_OUTPUT=$(POCKET_MUSIC_UPDATE_BASE_URL="file://$TMP/missing-release"
 FAILED_CHECK_STATUS=$?
 set -e
 [ "$FAILED_CHECK_STATUS" -ne 0 ] || fail "missing release must fail the update check"
+grep -Fx 'phase=checking' "$DATA/update/check-phase" >/dev/null || \
+  fail "failed check did not reset phase to checking"
 [ -f "$DATA/update/pending-update" ] || fail "failed check discarded verified pending update"
 [ "$(cat "$DATA/update/pending-update")" = "$PENDING_BEFORE" ] || \
   fail "failed check changed verified pending metadata"

@@ -9,6 +9,7 @@
 #include "fake_player.hpp"
 #include "test_suites.hpp"
 #include "ui/input.hpp"
+#include "ui/presentation.hpp"
 namespace fs = std::filesystem;
 namespace {
 void navigationQueue() {
@@ -69,10 +70,39 @@ void homeRowsExposePrimaryDestinations() {
     require(app.view.items.size() == 4, "Home must contain the update check destination");
     require(app.view.items[1].title == "Now Playing" && app.view.items[1].subtitle.empty(),
             "Now Playing must be a single-line destination");
-    require(app.view.items[2].title == "Liner Notes" && app.view.items[2].subtitle.empty(),
-            "Liner Notes must be a single-line destination");
+    require(app.view.items[2].title == "About" && app.view.items[2].subtitle.empty(),
+            "About must be a single-line destination");
     require(app.view.items[3].title == "Check for Updates" && app.view.items[3].subtitle.empty(),
             "Home must expose remote update checks");
+}
+
+void presentationMappingsAreSemantic() {
+    ViewItem install{"Install Update", "v0.2.7", ViewAction::InstallUpdate, std::nullopt};
+    const auto installRow = homeRowPresentation(install);
+    require(installRow.trailing == "v0.2.7" && !installRow.chevron,
+            "Home rows with details must render the actual item detail instead of a chevron");
+
+    ViewItem destination{"About", "", ViewAction::OpenAbout, std::nullopt};
+    require(homeRowPresentation(destination).chevron,
+            "Home destinations without details must render a chevron");
+
+    const auto loading = playbackPresentation(PlaybackPhase::Loading);
+    const auto playing = playbackPresentation(PlaybackPhase::Playing);
+    const auto paused = playbackPresentation(PlaybackPhase::Paused);
+    const auto finished = playbackPresentation(PlaybackPhase::Finished);
+    const auto error = playbackPresentation(PlaybackPhase::Error);
+    require(loading.status == "LOADING" && loading.primaryAction.empty(),
+            "loading must not look like active playback");
+    require(playing.status == "PLAYING" && playing.primaryAction == "PAUSE" &&
+                playing.showPauseIcon,
+            "playing must expose the pause action");
+    require(paused.status == "PAUSED" && paused.primaryAction == "PLAY" &&
+                !paused.showPauseIcon,
+            "paused must expose the play action");
+    require(finished.status == "FINISHED" && finished.primaryAction.empty(),
+            "finished playback must not imply an active transport action");
+    require(error.status == "PLAYBACK ERROR" && error.primaryAction == "RETRY",
+            "playback errors must expose Retry instead of Pause");
 }
 
 void updateCheckRunsInsideApp() {
@@ -125,6 +155,9 @@ void updateCheckRunsInsideApp() {
     require(app.view.items.size() == 5 && app.view.items[4].title == "Install Update" &&
                 app.view.items[4].subtitle == "v0.2.5",
             "completed check must refresh Home with the install action");
+    const auto installRow = homeRowPresentation(app.view.items[4]);
+    require(installRow.trailing == "v0.2.5" && !installRow.chevron,
+            "Install Update must present its pending version as trailing text");
 
     cancelUpdateCheck(app);
     unsetenv("POCKET_MUSIC_UPDATE_CHECKER");
@@ -280,17 +313,17 @@ void homeExitRequiresConfirmation() {
     require(!app.running, "confirming Exit must stop the app");
 }
 
-void linerNotesReturnsToHome() {
+void aboutReturnsToHome() {
     TemporaryDirectory temporary;
     AppState app(temporary.path / "Music", std::make_unique<FakePlayer>());
     buildHomeView(app);
     app.view.selected = 2;
 
     selectCurrentItem(app);
-    require(app.view.screen == Screen::LinerNotes, "Home must open Liner Notes");
+    require(app.view.screen == Screen::About, "Home must open About");
 
     navigateBack(app);
-    require(app.view.screen == Screen::Home, "Back from Liner Notes must restore Home");
+    require(app.view.screen == Screen::Home, "Back from About must restore Home");
 }
 
 void openingNowPlayingUsesOneNavigationPath() {
@@ -313,6 +346,7 @@ void addNavigationTests(TestCases& tests) {
     tests.emplace_back("navigation queue", navigationQueue);
     tests.emplace_back("failed load", failedLoad);
     tests.emplace_back("Home primary destinations", homeRowsExposePrimaryDestinations);
+    tests.emplace_back("semantic presentation mappings", presentationMappingsAreSemantic);
     tests.emplace_back("update check runs inside app", updateCheckRunsInsideApp);
     tests.emplace_back("pending update requires explicit install",
                        pendingUpdateRequiresExplicitInstallAction);
@@ -325,7 +359,7 @@ void addNavigationTests(TestCases& tests) {
     tests.emplace_back("restored Now Playing back returns to Home",
                        restoredNowPlayingBackReturnsToHome);
     tests.emplace_back("Home exit requires confirmation", homeExitRequiresConfirmation);
-    tests.emplace_back("Liner Notes returns to Home", linerNotesReturnsToHome);
+    tests.emplace_back("About returns to Home", aboutReturnsToHome);
     tests.emplace_back("Now Playing uses one navigation path",
                        openingNowPlayingUsesOneNavigationPath);
 }

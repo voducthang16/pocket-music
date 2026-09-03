@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include <memory>
 
 #include "app/app_state.hpp"
@@ -61,11 +62,38 @@ void homeRowsExposePrimaryDestinations() {
     buildHomeView(app);
 
     require(app.view.items[0].subtitle == "2", "Songs must expose a compact numeric count");
-    require(app.view.items.size() == 3, "Home must contain exactly three destinations");
+    require(app.view.items.size() == 4, "Home must contain the update destination");
     require(app.view.items[1].title == "Now Playing" && app.view.items[1].subtitle.empty(),
             "Now Playing must be a single-line destination");
     require(app.view.items[2].title == "Liner Notes" && app.view.items[2].subtitle.empty(),
             "Liner Notes must be a single-line destination");
+    require(app.view.items[3].title == "Check for Updates" && app.view.items[3].subtitle.empty(),
+            "Home must expose remote update checks");
+}
+
+void updateCheckRequestsLauncherWork() {
+    TemporaryDirectory temporary;
+    const auto dataDir = temporary.path / "data";
+    AppState app(temporary.path / "Music", std::make_unique<FakePlayer>());
+    buildHomeView(app);
+
+    setenv("POCKET_MUSIC_DATA_DIR", dataDir.c_str(), 1);
+    require(requestUpdateCheck(app), "TrimUI update check must create a launcher request");
+    unsetenv("POCKET_MUSIC_DATA_DIR");
+
+    require(!app.running, "update checks must shut the app down cleanly before network work");
+    require(fs::exists(dataDir / "update" / "check-requested"),
+            "update check request marker must be persisted");
+}
+
+void updateCheckIsTrimuiOnly() {
+    TemporaryDirectory temporary;
+    AppState app(temporary.path / "Music", std::make_unique<FakePlayer>());
+    unsetenv("POCKET_MUSIC_DATA_DIR");
+
+    require(!requestUpdateCheck(app), "desktop update check must not attempt TrimUI update flow");
+    require(app.running, "unsupported update check must keep the app running");
+    require(!app.message.empty(), "unsupported update check must explain why it is unavailable");
 }
 
 void trimuiFaceButtonMapping() {
@@ -174,6 +202,8 @@ void addNavigationTests(TestCases& tests) {
     tests.emplace_back("navigation queue", navigationQueue);
     tests.emplace_back("failed load", failedLoad);
     tests.emplace_back("Home primary destinations", homeRowsExposePrimaryDestinations);
+    tests.emplace_back("update check requests launcher work", updateCheckRequestsLauncherWork);
+    tests.emplace_back("update check is TrimUI only", updateCheckIsTrimuiOnly);
     tests.emplace_back("TrimUI face button mapping", trimuiFaceButtonMapping);
     tests.emplace_back("TrimUI Select repeat mapping", trimuiSelectCyclesRepeatMode);
     tests.emplace_back("restored Now Playing back returns to Home",

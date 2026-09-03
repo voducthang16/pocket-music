@@ -3,7 +3,9 @@
 #include <SDL_image.h>
 
 #include <cstdlib>
+#include <fstream>
 #include <iostream>
+#include <string>
 
 #include "app/app_state.hpp"
 #include "app/navigation.hpp"
@@ -39,6 +41,23 @@ std::filesystem::path fontPath() {
 SDL_Texture* loadResourceTexture(SDL_Renderer* renderer, const std::filesystem::path& relative) {
     const auto path = resourcePath(relative);
     return path.empty() ? nullptr : IMG_LoadTexture(renderer, path.c_str());
+}
+
+void loadUpdateStatus(AppState& app) {
+    const char* rawDataDir = std::getenv("POCKET_MUSIC_DATA_DIR");
+    if (!rawDataDir || !*rawDataDir || !app.message.empty()) return;
+
+    const std::filesystem::path statusPath =
+        std::filesystem::path(rawDataDir) / "update" / "last-status";
+    std::ifstream status(statusPath);
+    if (!status) return;
+
+    std::string line;
+    std::getline(status, line);
+    if (!line.empty()) app.message = line;
+
+    std::error_code error;
+    std::filesystem::remove(statusPath, error);
 }
 
 bool initializeUi(AppState& app, bool fullscreen) {
@@ -130,6 +149,7 @@ int runApplication(const std::filesystem::path& musicPath, const std::filesystem
         destroyUi(app);
         return 1;
     }
+    loadUpdateStatus(app);
     restore(app, statePath);
     uint64_t savedRevision = app.playback.revision();
     Uint64 lastSessionSave = SDL_GetTicks64();

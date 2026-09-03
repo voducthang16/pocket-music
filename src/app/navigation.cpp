@@ -1,6 +1,9 @@
 #include "app/navigation.hpp"
 
 #include <algorithm>
+#include <cstdlib>
+#include <fstream>
+#include <system_error>
 
 namespace {
 ViewItem trackItem(const Track& track, size_t index) {
@@ -24,7 +27,8 @@ ViewState homeView(const AppState& app) {
     view.items = {
         {"Songs", std::to_string(app.library.tracks().size()), ViewAction::OpenSongs, std::nullopt},
         {"Now Playing", "", ViewAction::OpenNowPlaying, std::nullopt},
-        {"Liner Notes", "", ViewAction::OpenLinerNotes, std::nullopt}};
+        {"Liner Notes", "", ViewAction::OpenLinerNotes, std::nullopt},
+        {"Check for Updates", "", ViewAction::CheckForUpdates, std::nullopt}};
     return view;
 }
 
@@ -65,6 +69,38 @@ void playAdjacentTrack(AppState& app, int direction) {
         app.playback.previous();
 }
 
+bool requestUpdateCheck(AppState& app) {
+    const char* rawDataDir = std::getenv("POCKET_MUSIC_DATA_DIR");
+    if (!rawDataDir || !*rawDataDir) {
+        app.message = "Remote updates are available on TrimUI";
+        return false;
+    }
+
+    const std::filesystem::path updateDir = std::filesystem::path(rawDataDir) / "update";
+    std::error_code error;
+    std::filesystem::create_directories(updateDir, error);
+    if (error) {
+        app.message = "Could not prepare update directory";
+        return false;
+    }
+
+    std::ofstream request(updateDir / "check-requested", std::ios::trunc);
+    if (!request) {
+        app.message = "Could not request update check";
+        return false;
+    }
+    request << "check\n";
+    request.close();
+    if (!request) {
+        app.message = "Could not save update request";
+        return false;
+    }
+
+    app.message = "Checking for updates...";
+    app.running = false;
+    return true;
+}
+
 void selectCurrentItem(AppState& app) {
     if (app.view.screen == Screen::NowPlaying || app.view.selected < 0 ||
         app.view.selected >= static_cast<int>(app.view.items.size()))
@@ -80,6 +116,9 @@ void selectCurrentItem(AppState& app) {
             return;
         case ViewAction::OpenLinerNotes:
             pushView(app, {Screen::LinerNotes, "Liner Notes", {}, 0, 0});
+            return;
+        case ViewAction::CheckForUpdates:
+            requestUpdateCheck(app);
             return;
         case ViewAction::None:
             break;

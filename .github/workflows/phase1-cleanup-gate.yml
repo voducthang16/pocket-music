@@ -1,0 +1,23 @@
+name: Phase 1 Cleanup Gate
+
+on:
+  push:
+    branches:
+      - refactor/codebase-cleanup
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Check formatting
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes clang-format
+          make format FORMATTER=clang-format
+          git diff --exit-code
+
+      - name: Build TrimUI package
+        run: make trimui-package

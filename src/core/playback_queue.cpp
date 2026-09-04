@@ -10,15 +10,16 @@ bool hasDuplicates(const std::vector<size_t>& values) {
 }
 }  // namespace
 
-void PlaybackQueue::reset(std::vector<size_t> source, size_t sourcePosition, bool shuffle,
+bool PlaybackQueue::reset(std::vector<size_t> source, size_t sourcePosition, bool shuffle,
                           uint32_t seed) {
+    if (hasDuplicates(source)) return false;
     source_ = std::move(source);
     history_.clear();
     shuffle_ = shuffle;
     if (source_.empty()) {
         order_.clear();
         cursor_ = 0;
-        return;
+        return true;
     }
     sourcePosition = std::min(sourcePosition, source_.size() - 1);
     if (shuffle_) {
@@ -27,6 +28,7 @@ void PlaybackQueue::reset(std::vector<size_t> source, size_t sourcePosition, boo
         order_ = source_;
         cursor_ = sourcePosition;
     }
+    return true;
 }
 
 void PlaybackQueue::buildShuffledOrder(size_t currentTrack, uint32_t seed) {
@@ -91,9 +93,7 @@ std::optional<size_t> PlaybackQueue::previous() {
     return previousTrack;
 }
 
-size_t PlaybackQueue::current() const {
-    return order_.empty() ? 0 : order_[cursor_];
-}
+size_t PlaybackQueue::current() const { return order_.empty() ? 0 : order_[cursor_]; }
 
 bool PlaybackQueue::restore(std::vector<size_t> source, std::vector<size_t> order,
                             std::vector<size_t> history, size_t cursor, bool shuffle) {

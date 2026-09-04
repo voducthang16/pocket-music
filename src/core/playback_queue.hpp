@@ -7,7 +7,7 @@
 
 class PlaybackQueue {
    public:
-    void reset(std::vector<size_t> source, size_t sourcePosition, bool shuffle,
+    bool reset(std::vector<size_t> source, size_t sourcePosition, bool shuffle,
                uint32_t seed = std::random_device{}());
     void setShuffle(bool shuffle, uint32_t seed = std::random_device{}());
     std::optional<size_t> next(bool repeatAll, uint32_t seed = std::random_device{}());

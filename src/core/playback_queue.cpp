@@ -1,18 +1,21 @@
 #include "core/playback_queue.hpp"
 
 #include <algorithm>
+#include <unordered_set>
 
 namespace {
-bool hasDuplicates(const std::vector<size_t>& values) {
-    auto sorted = values;
-    std::sort(sorted.begin(), sorted.end());
-    return std::adjacent_find(sorted.begin(), sorted.end()) != sorted.end();
+bool fillUniqueTracks(const std::vector<size_t>& values, std::unordered_set<size_t>& uniqueTracks) {
+    uniqueTracks.reserve(values.size());
+    for (const size_t track : values)
+        if (!uniqueTracks.insert(track).second) return false;
+    return true;
 }
 }  // namespace
 
 bool PlaybackQueue::reset(std::vector<size_t> source, size_t sourcePosition, bool shuffle,
                           uint32_t seed) {
-    if (hasDuplicates(source)) return false;
+    std::unordered_set<size_t> uniqueTracks;
+    if (!fillUniqueTracks(source, uniqueTracks)) return false;
     source_ = std::move(source);
     history_.clear();
     shuffle_ = shuffle;
@@ -99,10 +102,13 @@ bool PlaybackQueue::restore(std::vector<size_t> source, std::vector<size_t> orde
                             std::vector<size_t> history, size_t cursor, bool shuffle) {
     if (source.empty() || order.empty() || cursor >= order.size()) return false;
     if (order.size() != source.size()) return false;
-    if (hasDuplicates(source) || hasDuplicates(order)) return false;
-    if (!std::is_permutation(source.begin(), source.end(), order.begin())) return false;
-    for (size_t track : history)
-        if (std::find(source.begin(), source.end(), track) == source.end()) return false;
+    std::unordered_set<size_t> sourceTracks;
+    std::unordered_set<size_t> orderTracks;
+    if (!fillUniqueTracks(source, sourceTracks) || !fillUniqueTracks(order, orderTracks) ||
+        sourceTracks != orderTracks)
+        return false;
+    for (const size_t track : history)
+        if (sourceTracks.find(track) == sourceTracks.end()) return false;
     source_ = std::move(source);
     order_ = std::move(order);
     history_ = std::move(history);

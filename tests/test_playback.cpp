@@ -196,13 +196,20 @@ void shuffledPlaybackWrapsAfterEveryTrack() {
 
 void duplicateQueueEntriesAreRejected() {
     PlaybackQueue queue;
-    queue.reset({0, 1}, 1, false);
+    queue.reset({0, 1, 2}, 1, false);
+    queue.next(false);
     require(!queue.reset({0, 1, 1, 2}, 2, false),
             "queue reset must reject duplicate track entries");
-    require(queue.source() == std::vector<size_t>({0, 1}) && queue.current() == 1,
+    require(queue.source() == std::vector<size_t>({0, 1, 2}) &&
+                queue.order() == std::vector<size_t>({0, 1, 2}) && queue.current() == 2 &&
+                queue.history() == std::vector<size_t>({1}),
             "rejected queue reset must preserve the existing queue");
     require(!queue.restore({0, 1, 1, 2}, {0, 1, 1, 2}, {}, 2, false),
             "queue restore must reject duplicate track entries");
+    require(queue.source() == std::vector<size_t>({0, 1, 2}) &&
+                queue.order() == std::vector<size_t>({0, 1, 2}) && queue.current() == 2 &&
+                queue.history() == std::vector<size_t>({1}),
+            "rejected queue restore must preserve the existing queue");
 }
 
 void shutdownReleasesAudioPlayer() {

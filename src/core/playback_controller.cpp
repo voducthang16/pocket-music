@@ -16,13 +16,15 @@ bool PlaybackController::play(size_t trackIndex, const std::vector<size_t>& sour
             ? *sourcePosition
             : static_cast<size_t>(std::find(source.begin(), source.end(), trackIndex) -
                                   source.begin());
+    PlaybackQueue nextQueue = queue_;
+    if (!nextQueue.reset(source, selected, queue_.shuffle())) return false;
     if (!requestLoad(trackIndex, 0, false, LoadOrigin::User)) {
         failedLoad_->source = source;
         failedLoad_->sourcePosition = selected;
         failedLoad_->sourceTitle = std::move(sourceTitle);
         return false;
     }
-    queue_.reset(source, selected, queue_.shuffle());
+    queue_ = std::move(nextQueue);
     sourceTitle_ = std::move(sourceTitle);
     return true;
 }
@@ -194,11 +196,16 @@ void PlaybackController::previous() {
 void PlaybackController::retry() {
     if (snapshot_.phase != PlaybackPhase::Error || !failedLoad_) return;
     const auto failed = *failedLoad_;
+    std::optional<PlaybackQueue> nextQueue;
+    if (!failed.source.empty()) {
+        nextQueue = queue_;
+        if (!nextQueue->reset(failed.source, failed.sourcePosition, queue_.shuffle())) return;
+    }
     if (!requestLoad(failed.trackIndex, failed.resumeSeconds, failed.startPaused,
                      LoadOrigin::Retry))
         return;
-    if (!failed.source.empty()) {
-        queue_.reset(failed.source, failed.sourcePosition, queue_.shuffle());
+    if (nextQueue) {
+        queue_ = std::move(*nextQueue);
         sourceTitle_ = failed.sourceTitle;
     }
 }

@@ -1,4 +1,3 @@
-#include <algorithm>
 #include <memory>
 #include <numeric>
 #include <set>
@@ -195,15 +194,22 @@ void shuffledPlaybackWrapsAfterEveryTrack() {
             "shuffle next must not stop at the queue boundary");
 }
 
-void duplicateQueueEntriesArePreserved() {
+void duplicateQueueEntriesAreRejected() {
     PlaybackQueue queue;
-    queue.reset({0, 1, 1, 2}, 2, true, 11);
-    require(queue.sourcePosition() == 2,
-            "queue selection must retain the selected duplicate entry identity");
-    auto order = queue.order();
-    std::sort(order.begin(), order.end());
-    require(order == std::vector<size_t>({0, 1, 1, 2}),
-            "shuffle must preserve duplicate queue entries");
+    queue.reset({0, 1, 2}, 1, false);
+    queue.next(false);
+    require(!queue.reset({0, 1, 1, 2}, 2, false),
+            "queue reset must reject duplicate track entries");
+    require(queue.source() == std::vector<size_t>({0, 1, 2}) &&
+                queue.order() == std::vector<size_t>({0, 1, 2}) && queue.current() == 2 &&
+                queue.history() == std::vector<size_t>({1}),
+            "rejected queue reset must preserve the existing queue");
+    require(!queue.restore({0, 1, 1, 2}, {0, 1, 1, 2}, {}, 2, false),
+            "queue restore must reject duplicate track entries");
+    require(queue.source() == std::vector<size_t>({0, 1, 2}) &&
+                queue.order() == std::vector<size_t>({0, 1, 2}) && queue.current() == 2 &&
+                queue.history() == std::vector<size_t>({1}),
+            "rejected queue restore must preserve the existing queue");
 }
 
 void shutdownReleasesAudioPlayer() {
@@ -229,6 +235,6 @@ void addPlaybackTests(TestCases& tests) {
     tests.emplace_back("bounded error skipping", automaticErrorsSkipWithBoundedAttempts);
     tests.emplace_back("shuffle toggle", togglingShufflePreservesCurrentTrack);
     tests.emplace_back("shuffle wraps", shuffledPlaybackWrapsAfterEveryTrack);
-    tests.emplace_back("duplicate queue entries", duplicateQueueEntriesArePreserved);
+    tests.emplace_back("duplicate queue entries", duplicateQueueEntriesAreRejected);
     tests.emplace_back("shutdown releases audio player", shutdownReleasesAudioPlayer);
 }

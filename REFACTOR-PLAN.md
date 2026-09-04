@@ -354,10 +354,10 @@ Finding: it is always `0..N-1` and duplicates the shape of `tracks_`.
 
 Finding: `PlaybackQueue` contains non-trivial position/count mapping specifically to preserve duplicate track IDs, although current UI cannot create duplicate entries.
 
-- [ ] Decide explicitly whether duplicate queue entries are a current product requirement.
-- [ ] If not required now, simplify queue representation and remove duplicate-entry complexity/tests.
-- [ ] Do not preserve hypothetical playlist behavior prematurely.
-- [ ] If duplicates are later needed, model real queue-entry identity rather than implicit duplicate source positions.
+- [x] Decide explicitly whether duplicate queue entries are a current product requirement.
+- [x] If not required now, simplify queue representation and remove duplicate-entry complexity/tests.
+- [x] Do not preserve hypothetical playlist behavior prematurely.
+- [x] If duplicates are later needed, model real queue-entry identity rather than implicit duplicate source positions.
 
 ## 3.5 Simplify durable playback session schema
 
@@ -519,7 +519,7 @@ This index keeps the original audit findings traceable to tasks above.
 - [x] Controller input translated through fake keyboard events → 3.1
 - [x] Generic `ViewItem` duplicates/mixes track and menu data → 3.2
 - [x] Cached `allTrackIndexes_` identity vector → 3.3
-- [ ] Duplicate-entry queue complexity before playlists exist → 3.4
+- [x] Duplicate-entry queue complexity before playlists exist → 3.4
 - [ ] Playback state schema carries historical complexity → 3.5
 - [ ] Manual `PlaybackController::shutdown()` creates invalid half-alive object → 3.6
 - [ ] `AppState` owns too many unrelated resources → 3.7
